@@ -1,1 +1,3 @@
-TBD
+numpy
+scipy
+click
