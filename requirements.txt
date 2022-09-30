@@ -3,4 +3,4 @@ scipy
 seaborn
 open3d
 shapely
-git+git://github.mit.edu/SPARK/Spark-DSG@develop
+git+ssh://git@github.mit.edu/SPARK/Spark-DSG@develop
