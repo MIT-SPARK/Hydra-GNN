@@ -1,7 +1,9 @@
+"""Functions for parsing a house file."""
 import spark_dsg as dsg
+import seaborn as sns
+import numpy as np
 import shapely.geometry
 import shapely.ops
-import numpy as np
 
 
 def _filter_line(line):
@@ -108,32 +110,108 @@ def load_mp3d_info(house_path):
     return info
 
 
-def construct_mp3d_rooms(info):
-    """Make rooms given a loaded house file."""
+class Mp3dRoom:
+    """Quick utility class."""
+
+    def __init__(self, index, region, vertices, angle_deg=90.0):
+        """Make a polygon for a labeled room."""
+        self._index = index
+        self._pos = np.array(
+            [
+                region["pos"][0],
+                region["pos"][1],
+                region["pos"][2] + region["height"] / 2.0,
+            ]
+        )
+
+        self._min_z = np.mean(np.array(vertices)[:, 2])
+        self._max_z = self._min_z + region["height"]
+
+        # house files are rotated 90 degreees from Hydra convention
+        xy_polygon = shapely.geometry.Polygon([x[:2].tolist() for x in vertices])
+
+        theta = np.deg2rad(angle_deg)
+        R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+
+        self.pos[:2] = R @ self.pos[:2]
+        rotated_vertices = [
+            (R @ np.array(x)).tolist() for x in xy_polygon.exterior.coords
+        ]
+        self._polygon_xy = shapely.geometry.Polygon(rotated_vertices)
+
+    def pos_inside_room(self, pos):
+        """Check if a 3d position falls within the bounds of the room."""
+        if pos[2] <= self._min_z or pos[2] >= self._max_z:
+            return False
+
+        xy_pos = shapely.geometry.Point(pos[0], pos[1])
+        return self._polygon_xy.contains(xy_pos)
+
+    def get_attrs(self, color):
+        """Get DSG room attributes."""
+        attrs = dsg.RoomNodeAttributes()
+        attrs.color = color
+        attrs.name = str(dsg.NodeSymbol("R", self._index))
+        attrs.position = self._pos
+        attrs.last_update_time_ns = 0
+        attrs.semantic_label = ord(self._label)
+        return attrs
+
+
+def repartition_rooms(G_prev, mp3d_info):
+    """Create a copy of the DSG with ground-truth room nodes."""
+    G = G_prev.clone()
+
     rooms = []
-    for r_index, region in info["R"].items():
+    for r_index, region in mp3d_info["R"].items():
         vertices = []
 
         valid_surfaces = []
-        for s_index, surface in info["S"].items():
+        for s_index, surface in mp3d_info["S"].items():
             if surface["region"] == s_index:
                 valid_surfaces.append(s_index)
 
-        for v_index, vertex in info["V"].items():
+        for v_index, vertex in mp3d_info["V"].items():
             if vertex["surface"] in valid_surfaces:
                 vertices.append(vertex["pos"])
 
-        room = Room(
-            index=r_index,
-            label=region["label"],
-            pos=region["pos"],
-            height=region["height"],
-            level=region["floor"],
+        rooms.append(Mp3dRoom(r_index, region, vertices))
+
+    cmap = sns.color_palette("husl", len(rooms))
+
+    for index, room in enumerate(rooms):
+        color = np.array([int(255 * c) for c in cmap[index]][:3])
+        attrs = room.get_attrs(color)
+        attrs.name = str(dsg.NodeSymbol("R", room.index))
+        attrs.position = np.array(
+            [room.pos[0], room.pos[1], room.pos[2] + room.height / 2.0]
         )
-        room.set_vertices(vertices)
-        rooms.append(room)
+        attrs.last_update_time_ns = 0
+        attrs.semantic_label = ord(room.label)
 
-    for room in rooms:
-        room.rotate(-90)
+        G.add_node(dsg.DsgLayers.ROOMS, dsg.NodeSymbol("R", room.index), attrs)
 
-    return rooms
+    room_map = {}
+    missing_nodes = []
+    for place in G.get_layer(dsg.DsgLayers.PLACES).nodes:
+        pos = G.get_position(place.id.value)
+        for room in rooms:
+            if not room.pos_inside_room(pos):
+                continue
+
+            room_id = dsg.NodeSymbol("R", room.index)
+            room_map[place] = room_id
+            G.add_edge(place.id.valud, room_id.value)
+            break
+        else:
+            missing_nodes.append(place)
+
+    invalid_rooms = []
+    for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
+        if not room.has_children():
+            invalid_rooms.append(room.id.value)
+
+    for room_id in invalid_rooms:
+        G.remove_node(room_id)
+
+    return G

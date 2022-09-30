@@ -1,6 +1,5 @@
+"""Utilities to make a ground-truth graph from a house file."""
 import spark_dsg as dsg
-import shapely.geometry
-import shapely.ops
 import numpy as np
 import seaborn as sns
 import open3d as o3d
@@ -92,51 +91,5 @@ def construct_mp3d_dsg(info, building_label, mesh_path=None, compression_size=No
         colors = np.asarray(mesh.vertex_colors).T
         G.set_mesh_vertices(np.vstack((points, colors)))
         G.set_mesh_faces(np.asarray(mesh.triangles).T)
-
-    return G
-
-
-def repartition_rooms(G_prev, mp3d_info):
-    """Remove old nodes and make new ones."""
-    G = G_prev.clone()
-    cmap = sns.color_palette("husl", len(rooms))
-
-    for index, room in enumerate(rooms):
-        color = cmap[index]
-        attrs = dsg.RoomNodeAttributes()
-        attrs.color = np.array([int(255 * c) for c in color][:3])
-        attrs.name = str(dsg.NodeSymbol("R", room.index))
-        attrs.position = np.array(
-            [room.pos[0], room.pos[1], room.pos[2] + room.height / 2.0]
-        )
-        attrs.last_update_time_ns = 0
-        attrs.semantic_label = ord(room.label)
-
-        G.add_node(dsg.DsgLayers.ROOMS, dsg.NodeSymbol("R", room.index), attrs)
-
-    room_map = {}
-    missing_nodes = []
-    for place in G.get_layer(dsg.DsgLayers.PLACES).nodes:
-        pos = G.get_position(place.id.value)
-        xy_pos = shapely.geometry.Point(pos[0], pos[1])
-        for room in rooms:
-            if pos[2] <= room.floor_z or pos[2] >= room.floor_z + room.height:
-                continue
-
-            if room.polygon.contains(xy_pos):
-                room_id = dsg.NodeSymbol("R", room.index)
-                room_map[place] = room_id
-                G.add_edge(place.id.valud, room_id.value)
-                break
-        else:
-            missing_nodes.append(place)
-
-    invalid_rooms = []
-    for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
-        if not room.has_children():
-            invalid_rooms.append(room.id.value)
-
-    for room_id in invalid_rooms:
-        G.remove_node(room_id)
 
     return G
