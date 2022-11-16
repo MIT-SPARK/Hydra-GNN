@@ -98,7 +98,7 @@ PARSERS = {
 def load_mp3d_info(house_path):
     """Load room info from a GT house file."""
     info = {x: {} for x in PARSERS}
-    with house_path.open("r") as fin:
+    with open(house_path, "r") as fin:
         for line in fin:
             line_type, line = _filter_line(line)
             if line_type not in PARSERS:
@@ -116,6 +116,7 @@ class Mp3dRoom:
     def __init__(self, index, region, vertices, angle_deg=90.0):
         """Make a polygon for a labeled room."""
         self._index = index
+        self._label = region["label"]
         self._pos = np.array(
             [
                 region["pos"][0],
@@ -133,7 +134,7 @@ class Mp3dRoom:
         theta = np.deg2rad(angle_deg)
         R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
 
-        self.pos[:2] = R @ self.pos[:2]
+        self._pos[:2] = R @ self._pos[:2]
         rotated_vertices = [
             (R @ np.array(x)).tolist() for x in xy_polygon.exterior.coords
         ]
@@ -146,6 +147,9 @@ class Mp3dRoom:
 
         xy_pos = shapely.geometry.Point(pos[0], pos[1])
         return self._polygon_xy.contains(xy_pos)
+
+    def get_id(self):
+        return self._index
 
     def get_attrs(self, color):
         """Get DSG room attributes."""
@@ -182,14 +186,8 @@ def repartition_rooms(G_prev, mp3d_info):
     for index, room in enumerate(rooms):
         color = np.array([int(255 * c) for c in cmap[index]][:3])
         attrs = room.get_attrs(color)
-        attrs.name = str(dsg.NodeSymbol("R", room.index))
-        attrs.position = np.array(
-            [room.pos[0], room.pos[1], room.pos[2] + room.height / 2.0]
-        )
-        attrs.last_update_time_ns = 0
-        attrs.semantic_label = ord(room.label)
 
-        G.add_node(dsg.DsgLayers.ROOMS, dsg.NodeSymbol("R", room.index), attrs)
+        G.add_node(dsg.DsgLayers.ROOMS, room.get_id(), attrs)
 
     room_map = {}
     missing_nodes = []
@@ -199,9 +197,9 @@ def repartition_rooms(G_prev, mp3d_info):
             if not room.pos_inside_room(pos):
                 continue
 
-            room_id = dsg.NodeSymbol("R", room.index)
+            room_id = dsg.NodeSymbol("R", room.get_id())
             room_map[place] = room_id
-            G.add_edge(place.id.valud, room_id.value)
+            G.insert_edge(place.id.value, room_id.value)
             break
         else:
             missing_nodes.append(place)
