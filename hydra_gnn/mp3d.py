@@ -149,7 +149,7 @@ class Mp3dRoom:
         return self._polygon_xy.contains(xy_pos)
 
     def get_id(self):
-        return self._index
+        return dsg.NodeSymbol("R", self._index)
 
     def get_attrs(self, color):
         """Get DSG room attributes."""
@@ -192,7 +192,7 @@ def repartition_rooms(G_prev, mp3d_info):
         color = np.array([int(255 * c) for c in cmap[index]][:3])
         attrs = room.get_attrs(color)
 
-        G.add_node(dsg.DsgLayers.ROOMS, room.get_id(), attrs)
+        G.add_node(dsg.DsgLayers.ROOMS, room.get_id().value, attrs)
 
     room_map = {}
     missing_nodes = []
@@ -202,7 +202,7 @@ def repartition_rooms(G_prev, mp3d_info):
             if not room.pos_inside_room(pos):
                 continue
 
-            room_id = dsg.NodeSymbol("R", room.get_id())
+            room_id = room.get_id()
             room_map[place] = room_id
             G.insert_edge(place.id.value, room_id.value)
             break
