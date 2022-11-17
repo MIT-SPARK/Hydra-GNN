@@ -209,12 +209,8 @@ def repartition_rooms(G_prev, mp3d_info):
         else:
             missing_nodes.append(place)
 
-    invalid_rooms = []
     for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
         if not room.has_children():
-            invalid_rooms.append(room.id.value)
-
-    for room_id in invalid_rooms:
-        G.remove_node(room_id)
+            G.remove_node(room.id.value)
 
     return G
