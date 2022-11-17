@@ -166,6 +166,11 @@ def repartition_rooms(G_prev, mp3d_info):
     """Create a copy of the DSG with ground-truth room nodes."""
     G = G_prev.clone()
 
+    # remove existing rooms
+    existing_room_ids = [room.id.value for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes]
+    for i in existing_room_ids:
+        G.remove_node(i)
+
     rooms = []
     for r_index, region in mp3d_info["R"].items():
         vertices = []
