@@ -35,9 +35,9 @@ def parse_surface(line):
         "region": int(line[1]),
         "label": line[3],
         "pos": _make_vec3(line, 4),
-        "bbox_min": _make_vec3(line, 7),
-        "bbox_max": _make_vec3(line, 10),
-        "height": float(line[13]),
+        "normal": _make_vec3(line, 7),
+        "bbox_min": _make_vec3(line, 10),
+        "bbox_max": _make_vec3(line, 13),
     }
 
 
