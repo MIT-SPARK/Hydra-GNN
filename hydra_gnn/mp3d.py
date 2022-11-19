@@ -209,9 +209,10 @@ def repartition_rooms(G_prev, mp3d_info):
             break
         else:
             missing_nodes.append(place)
+    print(f"Found {len(missing_nodes)} outside of room segmentations.")
 
-    for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
-        if not room.has_children():
-            G.remove_node(room.id.value)
+    invalid_room_id = [room.id.value for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes if not room.has_children()]
+    for i in invalid_room_id:
+        G.remove_node(i)
 
     return G
