@@ -18,8 +18,8 @@ def _make_vec3(raw_list, start):
 def parse_region(line):
     """Get region info from a line."""
     return {
-        "id": int(line[0]),
-        "floor": int(line[1]),
+        "region_index": int(line[0]),
+        "level_index": int(line[1]),
         "label": line[4],
         "pos": _make_vec3(line, 5),
         "bbox_min": _make_vec3(line, 8),
@@ -31,8 +31,8 @@ def parse_region(line):
 def parse_surface(line):
     """Get surface info from a line."""
     return {
-        "id": int(line[0]),
-        "region": int(line[1]),
+        "surface_index": int(line[0]),
+        "region_index": int(line[1]),
         "label": line[3],
         "pos": _make_vec3(line, 4),
         "normal": _make_vec3(line, 7),
@@ -44,8 +44,8 @@ def parse_surface(line):
 def parse_vertex(line):
     """Get vertex info from a line."""
     return {
-        "id": int(line[0]),
-        "surface": int(line[1]),
+        "vertex_index": int(line[0]),
+        "surface_index": int(line[1]),
         "label": line[2],
         "pos": _make_vec3(line, 3),
         "normal": _make_vec3(line, 6),
@@ -55,20 +55,20 @@ def parse_vertex(line):
 def parse_category(line):
     """Get category info from a line."""
     return {
-        "id": int(line[0]),
-        "map_idx": int(line[1]),
-        "name": line[2],
-        "mpcat_idx": int(line[3]),
-        "mpcat_name": line[4],
+        "category_index": int(line[0]),
+        "category_mapping_index": int(line[1]),
+        "category_mapping_name": line[2],
+        "mpcat40_index": int(line[3]),
+        "mpcat40_name": line[4],
     }
 
 
 def parse_object(line):
     """Get object info from a line."""
     return {
-        "id": int(line[0]),
-        "region": int(line[1]),
-        "category": int(line[2]),
+        "object_index": int(line[0]),
+        "region_index": int(line[1]),
+        "category_index": int(line[2]),
         "pos": _make_vec3(line, 3),
         "a0": _make_vec3(line, 6),
         "a1": _make_vec3(line, 9),
@@ -79,9 +79,9 @@ def parse_object(line):
 def parse_segment(line):
     """Get segment info from a line."""
     return {
-        "id": int(line[0]),
-        "object": int(line[1]),
-        "face_id": line[3],
+        "segment_index": int(line[0]),
+        "object_index": int(line[1]),
+        "id": int(line[2]),
     }
 
 
@@ -97,7 +97,7 @@ PARSERS = {
 
 def load_mp3d_info(house_path):
     """Load room info from a GT house file."""
-    info = {x: {} for x in PARSERS}
+    info = {x: [] for x in PARSERS}
     with open(house_path, "r") as fin:
         for line in fin:
             line_type, line = _filter_line(line)
@@ -105,7 +105,7 @@ def load_mp3d_info(house_path):
                 continue
 
             new_element = PARSERS[line_type](line)
-            info[line_type][new_element["id"]] = new_element
+            info[line_type].append(new_element)
 
     return info
 
@@ -172,16 +172,17 @@ def repartition_rooms(G_prev, mp3d_info):
         G.remove_node(i)
 
     rooms = []
-    for r_index, region in mp3d_info["R"].items():
-        vertices = []
+    for region in mp3d_info["R"]:
+        r_index = region["region_index"]
 
         valid_surfaces = []
-        for s_index, surface in mp3d_info["S"].items():
-            if surface["region"] == s_index:
-                valid_surfaces.append(s_index)
+        for surface in mp3d_info["S"]:
+            if surface["region_index"] == r_index:
+                valid_surfaces.append(surface["surface_index"])
 
-        for v_index, vertex in mp3d_info["V"].items():
-            if vertex["surface"] in valid_surfaces:
+        vertices = []
+        for vertex in mp3d_info["V"]:
+            if vertex["surface_index"] in valid_surfaces:
                 vertices.append(vertex["pos"])
 
         rooms.append(Mp3dRoom(r_index, region, vertices))
