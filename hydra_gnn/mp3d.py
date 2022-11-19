@@ -46,9 +46,9 @@ def parse_vertex(line):
     return {
         "id": int(line[0]),
         "surface": int(line[1]),
-        "label": line[3],
-        "pos": _make_vec3(line, 4),
-        "normal": _make_vec3(line, 7),
+        "label": line[2],
+        "pos": _make_vec3(line, 3),
+        "normal": _make_vec3(line, 6),
     }
 
 
