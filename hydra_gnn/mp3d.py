@@ -12,7 +12,7 @@ def _filter_line(line):
 
 
 def _make_vec3(raw_list, start):
-    return np.array([float(x) for x in raw_list[start : start + 3]])
+    return np.array([float(x) for x in raw_list[start: start + 3]])
 
 
 def parse_region(line):
@@ -162,7 +162,7 @@ class Mp3dRoom:
         return attrs
 
 
-def repartition_rooms(G_prev, mp3d_info):
+def repartition_rooms(G_prev, mp3d_info, verbose=False):
     """Create a copy of the DSG with ground-truth room nodes."""
     G = G_prev.clone()
 
@@ -195,7 +195,6 @@ def repartition_rooms(G_prev, mp3d_info):
 
         G.add_node(dsg.DsgLayers.ROOMS, room.get_id().value, attrs)
 
-    room_map = {}
     missing_nodes = []
     for place in G.get_layer(dsg.DsgLayers.PLACES).nodes:
         pos = G.get_position(place.id.value)
@@ -204,15 +203,17 @@ def repartition_rooms(G_prev, mp3d_info):
                 continue
 
             room_id = room.get_id()
-            room_map[place] = room_id
             G.insert_edge(place.id.value, room_id.value)
             break
         else:
             missing_nodes.append(place)
-    print(f"Found {len(missing_nodes)} outside of room segmentations.")
+    if verbose:
+        print(f"Found {len(missing_nodes)} places node outside of room segmentations.")
 
     invalid_room_id = [room.id.value for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes if not room.has_children()]
     for i in invalid_room_id:
         G.remove_node(i)
+    if verbose:
+        print(f"Removed {len(invalid_room_id)} mp3d rooms without children.")
 
     return G
