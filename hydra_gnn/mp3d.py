@@ -148,6 +148,9 @@ class Mp3dRoom:
         xy_pos = shapely.geometry.Point(pos[0], pos[1])
         return self._polygon_xy.contains(xy_pos)
 
+    def get_polygon_xy(self):
+        return self._polygon_xy
+
     def get_id(self):
         return dsg.NodeSymbol("R", self._index)
 
@@ -188,12 +191,16 @@ def repartition_rooms(G_prev, mp3d_info, verbose=False):
         rooms.append(Mp3dRoom(r_index, region, vertices))
 
     cmap = sns.color_palette("husl", len(rooms))
+    building_ids = [building.id.value for building in G.get_layer(dsg.DsgLayers.BUILDINGS).nodes]
+    assert len(building_ids) == 1
 
     for index, room in enumerate(rooms):
         color = np.array([int(255 * c) for c in cmap[index]][:3])
         attrs = room.get_attrs(color)
 
-        G.add_node(dsg.DsgLayers.ROOMS, room.get_id().value, attrs)
+        room_id = room.get_id()
+        G.add_node(dsg.DsgLayers.ROOMS, room_id.value, attrs)
+        G.insert_edge(room_id.value, building_ids[0])
 
     missing_nodes = []
     for place in G.get_layer(dsg.DsgLayers.PLACES).nodes:
@@ -204,6 +211,15 @@ def repartition_rooms(G_prev, mp3d_info, verbose=False):
 
             room_id = room.get_id()
             G.insert_edge(place.id.value, room_id.value)
+
+            # check neighboring place node for room connections
+            neighboring_rooms = [G.get_node(i).get_parent() for i in place.siblings()]
+            neighboring_rooms = set(
+                filter(lambda x: x is not None and x != room_id.value, neighboring_rooms))
+            for neighbor_id in neighboring_rooms:
+                if neighbor_id not in G.get_node(room_id.value).siblings():
+                    G.insert_edge(room_id.value, neighbor_id)
+            
             break
         else:
             missing_nodes.append(place)
