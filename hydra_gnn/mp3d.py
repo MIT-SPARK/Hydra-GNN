@@ -153,9 +153,6 @@ class Mp3dRoom:
     def get_polygon_xy(self):
         return self._polygon_xy
 
-    def get_z_limits(self):
-        return self._min_z, self._max_z
-
     def get_id(self):
         return dsg.NodeSymbol("R", self._index)
 
@@ -269,8 +266,8 @@ def add_gt_room_label(G, mp3d_info, verbose=False):
         intersection_areas = []
         for mp3d_room in mp3d_rooms:
             xy_polygon = mp3d_room.get_polygon_xy()
-            z_min, z_max = mp3d_room.get_z_limits()
-            if z_min <= room.attributes.position[2] <= z_max and xy_polygon.intersects(bounding_box_xy):
+            # check whether hydra room position is inside the ground-truth room
+            if mp3d_room.pos_inside_room(room.attributes.position):
                 intersection_areas.append(xy_polygon.intersection(bounding_box_xy).area)
                 if verbose:
                     print(f"  {mp3d_room.get_id()} - {intersection_areas[-1]} / {xy_polygon.area}")
