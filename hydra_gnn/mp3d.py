@@ -129,10 +129,12 @@ class Mp3dRoom:
         self._max_z = self._min_z + region["height"]
 
         # house files are rotated 90 degreees from Hydra convention
-        xy_polygon = shapely.geometry.Polygon([x[:2].tolist() for x in vertices])
+        xy_polygon = shapely.geometry.Polygon(
+            [x[:2].tolist() for x in vertices])
 
         theta = np.deg2rad(angle_deg)
-        R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+        R = np.array([[np.cos(theta), -np.sin(theta)],
+                     [np.sin(theta), np.cos(theta)]])
 
         self._pos[:2] = R @ self._pos[:2]
         rotated_vertices = [
@@ -190,14 +192,16 @@ def repartition_rooms(G_prev, mp3d_info, verbose=False):
     G = G_prev.clone()
 
     # remove existing rooms
-    existing_room_ids = [room.id.value for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes]
+    existing_room_ids = [
+        room.id.value for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes]
     for i in existing_room_ids:
         G.remove_node(i)
 
     rooms = get_rooms_from_mp3d_info(mp3d_info, angle_deg=90.0)
 
     cmap = sns.color_palette("husl", len(rooms))
-    building_ids = [building.id.value for building in G.get_layer(dsg.DsgLayers.BUILDINGS).nodes]
+    building_ids = [building.id.value for building in G.get_layer(
+        dsg.DsgLayers.BUILDINGS).nodes]
     assert len(building_ids) == 1
 
     for index, room in enumerate(rooms):
@@ -219,7 +223,8 @@ def repartition_rooms(G_prev, mp3d_info, verbose=False):
             G.insert_edge(place.id.value, room_id.value)
 
             # check neighboring place node for room connections
-            neighboring_rooms = [G.get_node(i).get_parent() for i in place.siblings()]
+            neighboring_rooms = [G.get_node(i).get_parent()
+                                 for i in place.siblings()]
             neighboring_rooms = set(
                 filter(lambda x: x is not None and x != room_id.value, neighboring_rooms))
             for neighbor_id in neighboring_rooms:
@@ -230,9 +235,11 @@ def repartition_rooms(G_prev, mp3d_info, verbose=False):
         else:
             missing_nodes.append(place)
     if verbose:
-        print(f"Found {len(missing_nodes)} places node outside of room segmentations.")
+        print(
+            f"Found {len(missing_nodes)} places node outside of room segmentations.")
 
-    invalid_room_id = [room.id.value for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes if not room.has_children()]
+    invalid_room_id = [room.id.value for room in G.get_layer(
+        dsg.DsgLayers.ROOMS).nodes if not room.has_children()]
     for i in invalid_room_id:
         G.remove_node(i)
     if verbose:
