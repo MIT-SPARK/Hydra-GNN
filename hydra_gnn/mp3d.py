@@ -153,6 +153,9 @@ class Mp3dRoom:
     def get_polygon_xy(self):
         return self._polygon_xy
 
+    def get_z_limits(self):
+        return self._min_z, self._max_z
+
     def get_id(self):
         return dsg.NodeSymbol("R", self._index)
 
@@ -230,7 +233,7 @@ def repartition_rooms(G_prev, mp3d_info, verbose=False):
             for neighbor_id in neighboring_rooms:
                 if neighbor_id not in G.get_node(room_id.value).siblings():
                     G.insert_edge(room_id.value, neighbor_id)
-            
+
             break
         else:
             missing_nodes.append(place)
@@ -246,3 +249,39 @@ def repartition_rooms(G_prev, mp3d_info, verbose=False):
         print(f"Removed {len(invalid_room_id)} mp3d rooms without children.")
 
     return G
+
+
+def add_gt_room_label(G, mp3d_info, verbose=False):
+    """Add ground-truth room label to DSG based on maximum area of intersection."""
+
+    mp3d_rooms = get_rooms_from_mp3d_info(mp3d_info, 90.0)
+
+    for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
+        if verbose:
+            print('DSG', room.id, 'to ground-truth room - area of intersection')
+        bounding_box_xy = shapely.geometry.Polygon(
+            [[room.attributes.bounding_box.min[0], room.attributes.bounding_box.min[1]],
+             [room.attributes.bounding_box.min[0], room.attributes.bounding_box.max[1]],
+             [room.attributes.bounding_box.max[0], room.attributes.bounding_box.max[1]],
+             [room.attributes.bounding_box.max[0], room.attributes.bounding_box.min[1]]])
+
+        # Find the ground-truth room on the same z-axis with highest x-y area of intersection
+        intersection_areas = []
+        for mp3d_room in mp3d_rooms:
+            xy_polygon = mp3d_room.get_polygon_xy()
+            z_min, z_max = mp3d_room.get_z_limits()
+            if z_min <= room.attributes.position[2] <= z_max and xy_polygon.intersects(bounding_box_xy):
+                intersection_areas.append(xy_polygon.intersection(bounding_box_xy).area)
+                if verbose:
+                    print(f"  {mp3d_room.get_id()} - {intersection_areas[-1]} / {xy_polygon.area}")
+            else:
+                intersection_areas.append(0.0)
+        max_area = max(intersection_areas)
+        max_index = intersection_areas.index(max_area)
+
+        # Update DSG room label
+        if max_area > 0.01:
+            room.attributes.semantic_label = mp3d_rooms[max_index].get_attrs(
+                [0, 0, 0]).semantic_label
+            if verbose:
+                print(f"  {room.id} <- {mp3d_rooms[max_index].get_id()} (label: {chr(room.attributes.semantic_label)})")
