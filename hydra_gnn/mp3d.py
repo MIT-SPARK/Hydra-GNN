@@ -165,15 +165,8 @@ class Mp3dRoom:
         return attrs
 
 
-def repartition_rooms(G_prev, mp3d_info, verbose=False):
-    """Create a copy of the DSG with ground-truth room nodes."""
-    G = G_prev.clone()
-
-    # remove existing rooms
-    existing_room_ids = [room.id.value for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes]
-    for i in existing_room_ids:
-        G.remove_node(i)
-
+def get_rooms_from_mp3d_info(mp3d_info, angle_deg=90.0):
+    """Generate a list of Mp3dRoom objects from ground-truth segmentation."""
     rooms = []
     for region in mp3d_info["R"]:
         r_index = region["region_index"]
@@ -188,7 +181,20 @@ def repartition_rooms(G_prev, mp3d_info, verbose=False):
             if vertex["surface_index"] in valid_surfaces:
                 vertices.append(vertex["pos"])
 
-        rooms.append(Mp3dRoom(r_index, region, vertices))
+        rooms.append(Mp3dRoom(r_index, region, vertices, angle_deg=angle_deg))
+    return rooms
+
+
+def repartition_rooms(G_prev, mp3d_info, verbose=False):
+    """Create a copy of the DSG with ground-truth room nodes."""
+    G = G_prev.clone()
+
+    # remove existing rooms
+    existing_room_ids = [room.id.value for room in G.get_layer(dsg.DsgLayers.ROOMS).nodes]
+    for i in existing_room_ids:
+        G.remove_node(i)
+
+    rooms = get_rooms_from_mp3d_info(mp3d_info, angle_deg=90.0)
 
     cmap = sns.color_palette("husl", len(rooms))
     building_ids = [building.id.value for building in G.get_layer(dsg.DsgLayers.BUILDINGS).nodes]
