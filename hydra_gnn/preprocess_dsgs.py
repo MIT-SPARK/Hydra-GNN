@@ -62,6 +62,10 @@ ROOM_LABELS = [
     'D', # dining booth
     'S', # spa/sauna
     'Z', # junk (reflections of mirrors, random points floating in space, etc.)
+    '\x15', # Hydra-DSG unlabeled room
+]
+
+
 ]
 def convert_label_to_y(torch_data, room_labels=ROOM_LABELS, object_labels=OBJECT_LABELS):
     """
