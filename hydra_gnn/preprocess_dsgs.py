@@ -1,3 +1,5 @@
+import warnings
+import numpy as np
 import torch
 from torch_geometric.data import (Data, HeteroData)
 OBJECT_LABELS = [
@@ -66,8 +68,61 @@ ROOM_LABELS = [
 ]
 
 
-]
-def convert_label_to_y(torch_data, room_labels=ROOM_LABELS, object_labels=OBJECT_LABELS):
+
+
+def get_room_object_dsg(G, verbose=False):
+    """Create a room-object DSG by copying and connecting room and object nodes from the input DSG."""
+
+    # create an empty DSG and copy all room nodes
+    G_room_object = dsg.DynamicSceneGraph()
+    sibling_map = {}
+    for room_node in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
+        G_room_object.add_node(
+            room_node.layer, room_node.id.value, room_node.attributes)
+        sibling_map[room_node.id.value] = room_node.siblings()
+
+    # add edges between rooms
+    for room_id, sibling_ids in sibling_map.items():
+        for i in sibling_ids:
+            G_room_object.insert_edge(room_id, i)
+
+    invalid_objects = []
+    for object_node in G.get_layer(dsg.DsgLayers.OBJECTS).nodes:
+        if not object_node.has_parent():
+            invalid_objects.append(object_node)
+            warnings.warn(
+                f"{object_node.id} has no parent node in the input DSG.")
+            continue
+
+        # insert edge through object -> place -> room edges in G
+        parent_place = G.get_node(object_node.get_parent())
+        if parent_place.has_parent():
+            G_room_object.add_node(
+                object_node.layer, object_node.id.value, object_node.attributes)
+            G_room_object.insert_edge(
+                object_node.id.value, parent_place.get_parent())
+            if verbose:
+                print(f"{object_node.id} - direct edge")
+            continue
+
+        # insert edge through object -> place - (neighboring place) -> room edges in G
+        neighboring_places = parent_place.siblings()
+        for i in neighboring_places:
+            neighboring_place = G.get_node(i)
+            if neighboring_place.has_parent():
+                G_room_object.add_node(
+                    object_node.layer, object_node.id.value, object_node.attributes)
+                G_room_object.insert_edge(
+                    object_node.id.value, neighboring_place.get_parent())
+                if verbose:
+                    print(f"{object_node.id} - indirect edge")
+                break
+        else:
+            invalid_objects.append(object_node)
+            if verbose:
+                print(f"Drop {object_node.id}.")
+
+    return G_room_object
     """
     Convert labels
     """
