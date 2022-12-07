@@ -123,17 +123,41 @@ def get_room_object_dsg(G, verbose=False):
                 print(f"Drop {object_node.id}.")
 
     return G_room_object
+
+
+def _get_label_dict(labels, synonyms):
+        """Get mapping from (Hydra) labels to label index while grouping synonym labels. """
+        
+        if len(synonyms) == 0:
+            return dict(zip(labels, range(len(labels)))), len(labels)
+
+        all_labels_to_combine = [l for syn in synonyms for l in syn]
+        num_labels = len(labels) - len(all_labels_to_combine) + len(synonyms)
+        
+        # label to index mapping - unique labels
+        label_dict = dict(zip([l for l in labels if l not in all_labels_to_combine] + \
+            [syn[0] for syn in synonyms], range(num_labels)))
+        
+        # label to index mapping - synonym labels
+        label_index_offset = len(labels) - len(all_labels_to_combine)
+        for i, syn in enumerate(synonyms):
+            for l in syn:
+                label_dict[l] = i + label_index_offset
+
+        return label_dict, num_labels
+
+
+def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM_LABELS,
+                       object_synonyms=[], room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')] ):
     """
     Convert labels
     """
-    # converting room labels from unicode to integer
-    num_room_labels = len(room_labels)
-    room_label_dict = dict(zip(room_labels, range(num_room_labels)))
-    room_label_dict['\x15'] = num_room_labels - 1  # '\x15' is a hydra room without gt mp3d label
 
     # converting object labels from mp3d integer label to filtered integer label
-    num_object_labels = len(object_labels)
-    object_label_dict = dict(zip(object_labels, range(num_object_labels)))
+    object_label_dict, _ = _get_label_dict(object_labels, object_synonyms)
+
+    # converting room labels from unicode to integer
+    room_label_dict, _ = _get_label_dict(room_labels, room_synonyms)
 
     # add training label as y attribute to torch data
     if isinstance(torch_data, Data):
@@ -161,4 +185,6 @@ def get_room_object_dsg(G, verbose=False):
     else:
         raise NotImplemented
     
-    return room_label_dict, object_label_dict
+    return object_label_dict, room_label_dict
+
+
