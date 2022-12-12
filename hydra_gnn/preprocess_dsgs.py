@@ -125,11 +125,11 @@ def get_room_object_dsg(G, verbose=False):
     return G_room_object
 
 
-def _get_label_dict(labels, synonyms):
-        """Get mapping from (Hydra) labels to label index while grouping synonym labels. """
+def _get_label_dict(labels, synonyms=None):
+    """Get mapping from (Hydra) labels to integer label index while grouping synonym labels. """
         
-        if len(synonyms) == 0:
-            return dict(zip(labels, range(len(labels)))), len(labels)
+    if synonyms is None or len(synonyms) == 0:
+        return dict(zip(labels, range(len(labels))))
 
         all_labels_to_combine = [l for syn in synonyms for l in syn]
         num_labels = len(labels) - len(all_labels_to_combine) + len(synonyms)
@@ -144,7 +144,7 @@ def _get_label_dict(labels, synonyms):
             for l in syn:
                 label_dict[l] = i + label_index_offset
 
-        return label_dict, num_labels
+    return label_dict
 
 
 def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM_LABELS,
@@ -154,10 +154,10 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
     """
 
     # converting object labels from mp3d integer label to filtered integer label
-    object_label_dict, _ = _get_label_dict(object_labels, object_synonyms)
+    object_label_dict = _get_label_dict(object_labels, object_synonyms)
 
     # converting room labels from unicode to integer
-    room_label_dict, _ = _get_label_dict(room_labels, room_synonyms)
+    room_label_dict = _get_label_dict(room_labels, room_synonyms)
 
     # add training label as y attribute to torch data
     if isinstance(torch_data, Data):
