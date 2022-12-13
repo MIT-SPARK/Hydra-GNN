@@ -2,6 +2,8 @@ import warnings
 import numpy as np
 import torch
 from torch_geometric.data import (Data, HeteroData)
+import spark_dsg as dsg
+
 OBJECT_LABELS = [
     3,  # chair
     5,  # table
@@ -68,6 +70,141 @@ ROOM_LABELS = [
 ]
 
 
+def _is_on(G, n1, n2, threshold_on=1.0):
+    """
+    Check whether n1 is "on" n2 or n2 is "on" n1
+    Requires that the n1 center is inside n2 on xy plane, and n1 is above
+    n2 on z-axis within a threshold (or vice-versa).
+    """
+    pos1 = G.get_position(n1.id.value)
+    pos2 = G.get_position(n2.id.value)
+    size1 = _get_size(n1)
+    size2 = _get_size(n2)
+
+    xy_dist = np.abs(pos1[0:2] - pos2[0:2])
+    z_dist = np.abs(pos1[2] - pos2[2])
+    n1_above_n2 = pos1[2] > pos2[2]
+    new_thresh = threshold_on * (size1[2] + size2[2]) / 2
+
+    if all(xy_dist <= size2[0:2] / 2) and n1_above_n2 and z_dist <= new_thresh:
+        return True
+    elif all(xy_dist <= size1[0:2] / 2) and not n1_above_n2 and z_dist <= new_thresh:
+        return True
+    else:
+        return False
+
+
+def _is_above(G, n1, n2, threshold_near=2.0, threshold_on=1.0):
+    """
+    Check whether n1 is "above" n2 or n2 is "above" n1
+    Requires that the n1 center and n2 are nearby on the xy plane, and n1 is above
+    n2 on z-axis by an amount greater than a provided threshold.
+    """
+    pos1 = G.get_position(n1.id.value)
+    pos2 = G.get_position(n2.id.value)
+    size1 = _get_size(n1)
+    size2 = _get_size(n2)
+    near_thresh = (size1[0:2] + size2[0:2]) / 2.0 * threshold_near
+
+    xy_dist = np.abs(pos1[0:2] - pos2[0:2])
+    z_dist = np.abs(pos1[2] - pos2[2])
+    n1_above_n2 = pos1[2] > pos2[2]
+    dist_thresh = threshold_on * (size1[2] + size2[2]) / 2
+
+    if all(xy_dist <= near_thresh):
+        if n1_above_n2 and z_dist > dist_thresh:
+            return True
+        if not n1_above_n2 and z_dist > dist_thresh:
+            return True
+
+    return False
+
+
+def _is_under(G, n1, n2):
+    """
+    Check whether n1 is "under" n2 or n2 is "under" n1
+    Requires that either n1 or n2 is inside the other node on the xy place and
+    that the positions on the z-axis are distinct.
+    """
+    pos1 = G.get_position(n1.id.value)
+    pos2 = G.get_position(n2.id.value)
+    size1 = _get_size(n1)
+    size2 = _get_size(n2)
+
+    xy_dist = np.abs(pos1[0:2] - pos2[0:2])
+
+    if all(xy_dist <= size1[0:2] / 2) or all(xy_dist <= size2[0:2] / 2):
+        if pos1[2] < pos2[2]:
+            return True
+        if pos2[2] < pos1[2]:
+            return True
+
+    return False
+
+
+def _is_near(G, n1, n2, threshold_near=2.0, max_near=2.0):
+    """
+    Check whether n1 is "near" n2 or n2 is "near" n1
+    Requires that either n1 or n2 is inside the other node on the xy place and
+    that the positions on the z-axis are distinct.
+    """
+    pos1 = G.get_position(n1.id.value)
+    pos2 = G.get_position(n2.id.value)
+    size1 = _get_size(n1)
+    size2 = _get_size(n2)
+
+    avg_size = (size1 + size2) / 2.0
+    near_thresh = avg_size * threshold_near
+
+    dist = np.abs(pos1 - pos2)
+
+    # [LocatedNear]
+    if all(dist <= near_thresh) and all(dist - avg_size <= max_near * np.ones(3)):
+        return True
+
+    return False
+
+
+def _get_size(node):
+    return node.attributes.bounding_box.max - node.attributes.bounding_box.min
+
+
+def _dist(G, n1, n2):
+    return np.linalg.norm(G.get_position(n1) - G.get_position(n2))
+
+
+def add_object_connectivity(G, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
+    room_to_objects = dict()
+    for node in G.get_layer(dsg.DsgLayers.OBJECTS).nodes:
+        room_id = node.get_parent()
+        if room_id is None:
+            print(f"skipping invalid object {node.id}")
+            continue
+
+        if room_id not in room_to_objects:
+            room_to_objects[room_id] = [node]
+            continue
+
+        cmp_nodes = room_to_objects[room_id]
+        for cmp_node in cmp_nodes:
+            is_on = _is_on(G, node, cmp_node, threshold_on=threshold_on)
+            is_above = _is_above(
+                G,
+                node,
+                cmp_node,
+                threshold_near=threshold_near,
+                threshold_on=threshold_on,
+            )
+            is_under = _is_under(G, node, cmp_node)
+            is_near = _is_near(
+                G, node, cmp_node, threshold_near=threshold_near, max_near=max_near
+            )
+
+            if is_on or is_above or is_under or is_near:
+                # TODO(nathan) consider getting direction
+                assert G.insert_edge(node.id.value, cmp_node.id.value)
+
+        room_to_objects[room_id].append(node)
 
 
 def get_room_object_dsg(G, verbose=False):
