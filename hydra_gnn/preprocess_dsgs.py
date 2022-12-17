@@ -30,9 +30,9 @@ OBJECT_LABELS = [
     32,  # seating
     33,  # board_panel
     34,  # furniture
-    35,  # clothes
-    36,  # objects
-    37,  # misc
+    35,  # appliances
+    36,  # clothes
+    37,  # objects
 ]
 
 ROOM_LABELS = [
