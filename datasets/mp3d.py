@@ -17,7 +17,7 @@ from spark_dsg.torch_conversion import _centroid_bbx_embedding
 sys.path.append('../')
 from hydra_gnn.preprocess_dsgs import convert_label_to_y, add_object_connectivity, get_room_object_dsg
 
-BASE_DIR = './'
+BASE_DIR = '../'
 
 
 def extract_object_graph(graph_torch, tonx=True):
