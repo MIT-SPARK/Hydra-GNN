@@ -117,7 +117,8 @@ def generate_jth(G, zero_feature, remove_edges_every_layer=True):
     return JTG, root_nodes
 
 
-def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, remove_edges_every_layer=True):
+def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, remove_edges_every_layer=True,
+                                 verbose=False):
     """
     This function constructs a junction tree hierarchy tree for the graph G given root nodes stored in Ktree. Note: when
     calling this function from outside, make sure to run GenNodeLabels(G) to setup 'clique_has' and 'type' attributes
@@ -167,10 +168,12 @@ def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, r
             #     print("Progress constructing JTH: ", progress_threshold, "/", "100 %")
             if progress > progress_threshold + 5:
                 progress_threshold += 5
-                print("Progress constructing JTH: ", progress_threshold, "/", "100 %")
+                if verbose:
+                    print("Progress constructing JTH: ", progress_threshold, "/", "100 %")
 
             iter_count += 1
-    print("Progress constructing JTH: 100 / 100 %")
+    if verbose:
+        print("Progress constructing JTH: 100 / 100 %")
 
     JT = Igraph.copy()
 
@@ -267,7 +270,8 @@ def sample_and_generate_jth(G, k, zero_feature, copy_node_attributes=None, need_
     if verbose:
         tic = time.perf_counter()
         print("Sampling Graph")
-    G_sampled, Ktree = subsampling.bounded_treewidth_sampling(G, k=k, copy_node_attributes=copy_node_attributes)
+    G_sampled, Ktree = subsampling.bounded_treewidth_sampling(G, k=k, copy_node_attributes=copy_node_attributes,
+                                                              verbose=verbose)
     if verbose:
         toc = time.perf_counter()
         print("Done Sampling (time elapsed: {:.1f} min).".format((toc - tic) / 60))
@@ -285,7 +289,8 @@ def sample_and_generate_jth(G, k, zero_feature, copy_node_attributes=None, need_
     G_sampled = generate_node_labels(G_sampled)
     JTH, root_nodes = generate_jth_with_root_nodes(G_sampled, Ktree, zero_feature=zero_feature,
                                                    need_root_tree=need_root_tree,
-                                                   remove_edges_every_layer=remove_edges_every_layer)
+                                                   remove_edges_every_layer=remove_edges_every_layer,
+                                                   verbose=verbose)
 
     if verbose:
         toc = time.perf_counter()

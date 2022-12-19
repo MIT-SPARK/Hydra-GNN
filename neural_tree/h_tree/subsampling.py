@@ -207,7 +207,7 @@ def Initialize_kTree_And_Subgraph(G, k):
     return U, K, G
 
 
-def bounded_treewidth_sampling(G, k, copy_node_attributes='x'):
+def bounded_treewidth_sampling(G, k, copy_node_attributes='x', verbose=False):
     # Input: G:: NetworkX Graph
     # Input: k:: tree-width bound
 
@@ -227,7 +227,8 @@ def bounded_treewidth_sampling(G, k, copy_node_attributes='x'):
         # print("Progress Graph Sampling: ", len(U.nodes()), "/", len(G.nodes()))
         if 100.0 * len(U.nodes()) / len(G.nodes()) > progress_threshold + 5:
             progress_threshold += 5
-            print("Progress Graph Sampling: ", progress_threshold, "/", "100 %")
+            if verbose:
+                print("Progress Graph Sampling: ", progress_threshold, "/", "100 %")
 
         sampled_node = sample_node(G=G, taken_nodes=U.nodes())
         C = G.nodes[sampled_node]["k_set"]
@@ -241,7 +242,8 @@ def bounded_treewidth_sampling(G, k, copy_node_attributes='x'):
         # update score
         G = score_update(G=G, k=k, inducted_node=sampled_node, inducted_to_clique=C)
 
-    print("Progress Graph Sampling: 100 / 100 %")
+    if verbose:
+        print("Progress Graph Sampling: 100 / 100 %")
 
     if copy_node_attributes is not None:
         # Copies the needed node attribute
