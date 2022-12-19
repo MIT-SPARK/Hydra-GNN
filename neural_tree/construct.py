@@ -9,12 +9,12 @@ from datasets.mp3d import MP3D, extract_object_graph, extract_room_graph
 from neural_tree.h_tree.generate_junction_tree_hierarchies import sample_and_generate_jth, generate_node_labels
 
 
-def nx_dsg_jth_to_torch(nx_dsg_jth):
+def nx_dsg_jth_to_torch(dsg_jth_nx):
     """
     takes an nx_dsg, and outputs
     """
 
-    for idx, data_ in nx_dsg_jth.nodes.items():
+    for idx, data_ in dsg_jth_nx.nodes.items():
         if 'label' not in set(data_.keys()):
             data_['label'] = -10    # adding fake label to all clique nodes
 
@@ -27,7 +27,7 @@ def nx_dsg_jth_to_torch(nx_dsg_jth):
     label_ = []
     node_type_ = []
 
-    for idx, data in nx_dsg_jth.nodes.items():
+    for idx, data in dsg_jth_nx.nodes.items():
         x_.append(torch.tensor(data['x']))
         pos_.append(torch.tensor(data['pos']))
         label_.append(data['label'])
@@ -51,14 +51,14 @@ def nx_dsg_jth_to_torch(nx_dsg_jth):
     node_type_ = torch.tensor(node_type_)
 
     # edges
-    edges = list(nx_dsg_jth.edges)
+    edges = list(dsg_jth_nx.edges)
     edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
 
     edge_type_=[]
     for (i, j) in edges:
 
-        ci = nx_dsg_jth.nodes[i]['node_type']
-        cj = nx_dsg_jth.nodes[j]['node_type']
+        ci = dsg_jth_nx.nodes[i]['node_type']
+        cj = dsg_jth_nx.nodes[j]['node_type']
 
         if (ci == 'object' and cj == 'object-room') or (ci == 'object-room' and cj == 'object'):
             _type = 0
@@ -95,6 +95,7 @@ def nx_dsg_jth_to_torch(nx_dsg_jth):
     _g = Data(x=x_, edge_index=edge_index, y=label_, pos=pos_, node_type=node_type_, edge_type=edge_type_)
 
     # extracting the heterogeneous graph
+    #TODO: error here.
     jth_torch = _g.to_heterogeneous(node_type=_g.node_type,
                                     node_type_names=names_n,
                                     edge_type=_g.edge_type)
@@ -121,7 +122,10 @@ def dsg_torch_to_nx(dsg_torch):
 
     # converting to networkx
     _g = dsg_torch.to_homogeneous()
-    dsg_nx = to_networkx(_g, node_attrs=['x', 'pos', 'label', 'node_type']).to_undirected()
+    try:
+        dsg_nx = to_networkx(_g, node_attrs=['x', 'pos', 'label', 'node_type']).to_undirected()
+    except (AttributeError, ValueError):
+        breakpoint()
 
     # changing node_type from 0/1 to object/room
     for (idx, data) in dsg_nx.nodes.items():
@@ -149,7 +153,7 @@ def get_room_graph(dsg_nx):
     return dsg_nx.subgraph(_room_idx), _room_idx
 
 
-def generate_component_jth(dsg_nx_component, component_type, room_node_data=None):
+def generate_component_jth(dsg_nx_component, component_type, room_node_data=None, verbose=False):
     """
     generates jth and root_nodes, given either room graph or objects graph in dsg_nx format
 
@@ -170,7 +174,7 @@ def generate_component_jth(dsg_nx_component, component_type, room_node_data=None
                                                                              'node_type'],
                                                        need_root_tree=True,
                                                        remove_edges_every_layer=True,
-                                                       verbose=True)
+                                                       verbose=verbose)
 
         # if room graph has only one node, "sample_and_generate_jth" returns nothing for room_root_nodes
         if len(dsg_nx_component) == 1:
@@ -201,7 +205,7 @@ def generate_component_jth(dsg_nx_component, component_type, room_node_data=None
                                                                              'node_type'],
                                                        need_root_tree=True,
                                                        remove_edges_every_layer=True,
-                                                       verbose=True)
+                                                       verbose=verbose)
         #
         _num_nodes = _jth.number_of_nodes()
         _idx_count = _num_nodes
@@ -315,7 +319,7 @@ class HTree:
                     self.jth.add_edge(_root_node, _object_root_idx)
 
 
-def generate_htree(dsg_torch):
+def generate_htree(dsg_torch, verbose=False):
     """
     takes in heterogeneous dsg_torch and generates h-tree using the sequential procedure.
 
@@ -336,7 +340,8 @@ def generate_htree(dsg_torch):
 
         # extracting H-tree of the room graph
         dsg_component_room_jth, _room_root_nodes = generate_component_jth(dsg_nx_component=dsg_component_room,
-                                                                          component_type="rooms")
+                                                                          component_type="rooms",
+                                                                          verbose=verbose)
 
         # create a Htree
         _htree = HTree(room_jth=dsg_component_room_jth, room_root_nodes=_room_root_nodes)
@@ -356,7 +361,8 @@ def generate_htree(dsg_torch):
                 object_component_jth, _object_root_nodes = \
                     generate_component_jth(dsg_nx_component=object_graph_component,
                                            component_type="objects",
-                                           room_node_data=(r, dsg_component.nodes[r]))
+                                           room_node_data=(r, dsg_component.nodes[r]),
+                                           verbose=verbose)
 
                 # adding to _htree
                 _htree.add_object_jth(object_jth=object_component_jth,
@@ -370,9 +376,39 @@ def generate_htree(dsg_torch):
 
 if __name__ == "__main__":
 
-    dset = MP3D(complete=True)
+    dset = MP3D(complete=False)
 
-    data = dset[0]
-    graph_torch = data['dsg_torch']
+    # data = dset[2]
+    # dsg_torch = data['dsg_torch']
+    #
+    # dsg_jth_list = generate_htree(dsg_torch, verbose=False)
+    # dsg_jth_nx = dsg_jth_list[0].jth
+    # dsg_jth_torch = nx_dsg_jth_to_torch(dsg_jth_nx)
 
-    htree_list = generate_htree(graph_torch)
+    for idx, data in enumerate(dset):
+
+        dsg_torch = data['dsg_torch']
+
+        if dsg_torch.num_nodes <= 10:
+
+            print("---" * 40)
+            print(f"DSG contains only {dsg_torch.num_nodes} node.")
+            print(f"We skip H-tree construction for MP3D scene: {idx}")
+            print("---" * 40)
+
+        else:
+
+            print("---" * 40)
+            print(f"H-tree constructed for MP3D Scene: {idx}.")
+            print(f"DSG contains {dsg_torch.num_nodes} nodes.")
+
+            # compute h-trees
+            dsg_jth_list = generate_htree(dsg_torch, verbose=False)
+
+            print(f"DSG is divided into {len(dsg_jth_list)} disconnected components.")
+            for c in range(len(dsg_jth_list)):
+                print(f"Component {c}: H-tree contains {dsg_jth_list[c].jth.number_of_nodes()} nodes "
+                      f"and {dsg_jth_list[c].jth.number_of_edges()} edges.")
+            print("---" * 40)
+
+
