@@ -380,7 +380,7 @@ def generate_htree(dsg_torch, verbose=False):
 
 if __name__ == "__main__":
 
-    dset = MP3D(complete=False)
+    dset = MP3D(complete=True)
 
     # data = dset[2]
     # dsg_torch = data['dsg_torch']
