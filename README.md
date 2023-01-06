@@ -10,7 +10,7 @@ by Rajat Talak
 
 ### Dataset
 
-Put the dataset in the folder ./data. It is organized as follows:
+Put the dataset and pre-trained word2vec model in the folder ./data. It is organized as follows:
 
 - data
   - house_files
@@ -19,6 +19,7 @@ Put the dataset in the folder ./data. It is organized as follows:
     - hydra_mp3d_non_gt_dataset
     - mp3d_with_agents
   - tro_graphs_2022_09_24
+  - GoogleNews-vectors-negative300.bin [link](https://www.kaggle.com/datasets/leadbest/googlenewsvectorsnegative300)
 
 
 ### Dataset nomenclature
