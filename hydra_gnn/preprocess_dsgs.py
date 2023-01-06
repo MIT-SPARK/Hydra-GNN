@@ -284,7 +284,7 @@ def _get_label_dict(labels, synonyms=None):
 
 
 def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM_LABELS,
-                       object_synonyms=[], room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')] ):
+                       object_synonyms=[], room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]):
     """
     Convert labels
     """
@@ -311,7 +311,7 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
         assert len(torch_data.node_types) == 2
         assert 'objects' in torch_data.node_types
         assert 'rooms' in torch_data.node_types
-        
+
         object_y = [object_label_dict[l] for l in torch_data['objects'].label.tolist()]
         room_y = [room_label_dict[chr(l)] for l in torch_data['rooms'].label.tolist()]
 
@@ -342,5 +342,3 @@ def hydra_node_converter(object_feature_converter, room_feature_converter=lambda
         else:
             raise NotImplemented
     return node_converter
-
-
