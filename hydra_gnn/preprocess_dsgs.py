@@ -243,43 +243,42 @@ def get_room_object_dsg(G, verbose=False):
             continue
 
         # insert edge through object -> place - (neighboring place) -> room edges in G
-        neighboring_places = parent_place.siblings()
-        for i in neighboring_places:
-            neighboring_place = G.get_node(i)
-            if neighboring_place.has_parent():
-                G_room_object.add_node(
-                    object_node.layer, object_node.id.value, object_node.attributes)
-                G_room_object.insert_edge(
-                    object_node.id.value, neighboring_place.get_parent())
-                if verbose:
-                    print(f"{object_node.id} - indirect edge")
-                break
-        else:
+        neighboring_dist = [(_dist(G, parent_place.id.value, n), n) \
+            for n in parent_place.siblings() if G.get_node(n).has_parent()]
+        if len(neighboring_dist) == 0:
             invalid_objects.append(object_node)
             if verbose:
                 print(f"Drop {object_node.id}.")
+        else:
+            neighboring_dist.sort(key=lambda x: x[0])
+            G_room_object.add_node(
+                object_node.layer, object_node.id.value, object_node.attributes)
+            G_room_object.insert_edge(
+                object_node.id.value, G.get_node(neighboring_dist[0][1]).get_parent())
+            if verbose:
+                print(f"{object_node.id} - indirect edge")
 
     return G_room_object
 
 
 def _get_label_dict(labels, synonyms=None):
     """Get mapping from (Hydra) labels to integer label index while grouping synonym labels. """
-        
+    
     if synonyms is None or len(synonyms) == 0:
         return dict(zip(labels, range(len(labels))))
 
-        all_labels_to_combine = [l for syn in synonyms for l in syn]
-        num_labels = len(labels) - len(all_labels_to_combine) + len(synonyms)
-        
-        # label to index mapping - unique labels
-        label_dict = dict(zip([l for l in labels if l not in all_labels_to_combine] + \
-            [syn[0] for syn in synonyms], range(num_labels)))
-        
-        # label to index mapping - synonym labels
-        label_index_offset = len(labels) - len(all_labels_to_combine)
-        for i, syn in enumerate(synonyms):
-            for l in syn:
-                label_dict[l] = i + label_index_offset
+    all_labels_to_combine = [l for syn in synonyms for l in syn]
+    num_labels = len(labels) - len(all_labels_to_combine) + len(synonyms)
+    
+    # label to index mapping - unique labels
+    label_dict = dict(zip([l for l in labels if l not in all_labels_to_combine] + \
+        [syn[0] for syn in synonyms], range(num_labels)))
+    
+    # label to index mapping - synonym labels
+    label_index_offset = len(labels) - len(all_labels_to_combine)
+    for i, syn in enumerate(synonyms):
+        for l in syn:
+            label_dict[l] = i + label_index_offset
 
     return label_dict
 
