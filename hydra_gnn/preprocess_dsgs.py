@@ -325,3 +325,23 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
     return object_label_dict, room_label_dict
 
 
+def _hydra_object_feature_converter(hydra_colormap_data, word2vec_model):
+    return lambda i: np.mean(
+        [word2vec_model[s] for s in hydra_colormap_data['name'][i].split("_") if s != "of"], axis=0,)
+
+
+def hydra_node_converter(object_feature_converter, room_feature_converter=lambda i:np.empty(0)):
+    def node_converter(G, x):
+        if x.layer == 2:    # object
+            return np.hstack((x.attributes.position, 
+                              x.attributes.bounding_box.max - x.attributes.bounding_box.min, 
+                              object_feature_converter(x.attributes.semantic_label).astype(x.attributes.position.dtype)))
+        elif x.layer == 4:  # room
+            return np.hstack((x.attributes.position, 
+                              x.attributes.bounding_box.max - x.attributes.bounding_box.min,
+                              room_feature_converter(x.attributes.semantic_label).astype(x.attributes.position.dtype)))
+        else:
+            raise NotImplemented
+    return node_converter
+
+
