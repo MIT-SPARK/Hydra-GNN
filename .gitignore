@@ -2,7 +2,9 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=python
 
 # Dataset dirs
-data
+data/house_files
+data/mp3d_old
+data/tro_graphs_2022_09_24
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

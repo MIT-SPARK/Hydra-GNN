@@ -41,13 +41,13 @@ import gensim.models.keyedvectors
 
 
 def pytest_configure():
-    colormap_data_path = pathlib.Path(__file__).resolve().parent.parent / "data_files/colormap.csv"
+    colormap_data_path = pathlib.Path(__file__).resolve().parent.parent / "data/colormap.csv"
     if os.path.exists(colormap_data_path):
         pytest.colormap_data = pd.read_csv(colormap_data_path, delimiter=',')
     else:
         pytest.colormap_data = None
     
-    word2vec_model_path = pathlib.Path(__file__).resolve().parent.parent / "data_files/GoogleNews-vectors-negative300.bin"
+    word2vec_model_path = pathlib.Path(__file__).resolve().parent.parent / "data/GoogleNews-vectors-negative300.bin"
     if os.path.exists(word2vec_model_path):
         pytest.word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(word2vec_model_path, binary=True)
     else:
