@@ -30,43 +30,43 @@ OBJECT_LABELS = [
     32,  # seating
     33,  # board_panel
     34,  # furniture
-    35,  # clothes
-    36,  # objects
-    37,  # misc
+    35,  # appliances
+    36,  # clothes
+    37,  # objects
 ]
 
 ROOM_LABELS = [
-    'a',  # bathroom (should have a toilet and a sink)
-    'b',  # bedroom
-    'c',  # closet
-    'd',  # dining room (includes “breakfast rooms” other rooms people mainly eat in)
-    'e',  # entryway/foyer/lobby (should be the front door, not any door)
-    'f',  # familyroom (should be a room that a family hangs out in, not any area with couches)
-    'g',  # garage
-    'h',  # hallway
-    'i',  # library (should be room like a library at a university, not an individual study)
-    'j',  # laundryroom/mudroom (place where people do laundry, etc.)
-    'k',  # kitchen
-    'l',  # living room (should be the main “showcase” living room in a house, not any area with couches)
-    'm',  # meetingroom/conferenceroom
-    'n',  # lounge (any area where people relax in comfy chairs/couches that is not the family room or living room
-    'o',  # office (usually for an individual, or a small set of people)
-    'p',  # porch/terrace/deck/driveway (must be outdoors on ground level)
-    'r',  # rec/game (should have recreational objects, like pool table, etc.)
-    's',  # stairs
-    't',  # toilet (should be a small room with ONLY a toilet)
-    'u',  # utilityroom/toolroom
-    'v',  # tv (must have theater-style seating)
-    'w',  # workout/gym/exercise
-    'x',  # outdoor areas containing grass, plants, bushes, trees, etc.
-    'y',  # balcony (must be outside and must not be on ground floor)
-    'z',  # other room (it is clearly a room, but the function is not clear)
-    'B',  # bar
-    'C',  # classroom
-    'D',  # dining booth
-    'S',  # spa/sauna
-    'Z',  # junk (reflections of mirrors, random points floating in space, etc.)
-    '\x15',  # Hydra-DSG unlabeled room
+    'a', # bathroom (should have a toilet and a sink)
+    'b', # bedroom
+    'c', # closet
+    'd', # dining room (includes “breakfast rooms” other rooms people mainly eat in)
+    'e', # entryway/foyer/lobby (should be the front door, not any door)
+    'f', # familyroom (should be a room that a family hangs out in, not any area with couches)
+    'g', # garage
+    'h', # hallway
+    'i', # library (should be room like a library at a university, not an individual study)
+    'j', # laundryroom/mudroom (place where people do laundry, etc.)
+    'k', # kitchen
+    'l', # living room (should be the main “showcase” living room in a house, not any area with couches)
+    'm', # meetingroom/conferenceroom
+    'n', # lounge (any area where people relax in comfy chairs/couches that is not the family room or living room
+    'o', # office (usually for an individual, or a small set of people)
+    'p', # porch/terrace/deck/driveway (must be outdoors on ground level)
+    'r', # rec/game (should have recreational objects, like pool table, etc.)
+    's', # stairs
+    't', # toilet (should be a small room with ONLY a toilet)
+    'u', # utilityroom/toolroom 
+    'v', # tv (must have theater-style seating)
+    'w', # workout/gym/exercise
+    'x', # outdoor areas containing grass, plants, bushes, trees, etc.
+    'y', # balcony (must be outside and must not be on ground floor)
+    'z', # other room (it is clearly a room, but the function is not clear)
+    'B', # bar
+    'C', # classroom
+    'D', # dining booth
+    'S', # spa/sauna
+    'Z', # junk (reflections of mirrors, random points floating in space, etc.)
+    '\x15', # Hydra-DSG unlabeled room
 ]
 
 
@@ -243,43 +243,42 @@ def get_room_object_dsg(G, verbose=False):
             continue
 
         # insert edge through object -> place - (neighboring place) -> room edges in G
-        neighboring_places = parent_place.siblings()
-        for i in neighboring_places:
-            neighboring_place = G.get_node(i)
-            if neighboring_place.has_parent():
-                G_room_object.add_node(
-                    object_node.layer, object_node.id.value, object_node.attributes)
-                G_room_object.insert_edge(
-                    object_node.id.value, neighboring_place.get_parent())
-                if verbose:
-                    print(f"{object_node.id} - indirect edge")
-                break
-        else:
+        neighboring_dist = [(_dist(G, parent_place.id.value, n), n) \
+            for n in parent_place.siblings() if G.get_node(n).has_parent()]
+        if len(neighboring_dist) == 0:
             invalid_objects.append(object_node)
             if verbose:
                 print(f"Drop {object_node.id}.")
+        else:
+            neighboring_dist.sort(key=lambda x: x[0])
+            G_room_object.add_node(
+                object_node.layer, object_node.id.value, object_node.attributes)
+            G_room_object.insert_edge(
+                object_node.id.value, G.get_node(neighboring_dist[0][1]).get_parent())
+            if verbose:
+                print(f"{object_node.id} - indirect edge")
 
     return G_room_object
 
 
 def _get_label_dict(labels, synonyms=None):
     """Get mapping from (Hydra) labels to integer label index while grouping synonym labels. """
-
+    
     if synonyms is None or len(synonyms) == 0:
         return dict(zip(labels, range(len(labels))))
 
-        all_labels_to_combine = [l for syn in synonyms for l in syn]
-        num_labels = len(labels) - len(all_labels_to_combine) + len(synonyms)
-
-        # label to index mapping - unique labels
-        label_dict = dict(zip([l for l in labels if l not in all_labels_to_combine] + \
-                              [syn[0] for syn in synonyms], range(num_labels)))
-
-        # label to index mapping - synonym labels
-        label_index_offset = len(labels) - len(all_labels_to_combine)
-        for i, syn in enumerate(synonyms):
-            for l in syn:
-                label_dict[l] = i + label_index_offset
+    all_labels_to_combine = [l for syn in synonyms for l in syn]
+    num_labels = len(labels) - len(all_labels_to_combine) + len(synonyms)
+    
+    # label to index mapping - unique labels
+    label_dict = dict(zip([l for l in labels if l not in all_labels_to_combine] + \
+        [syn[0] for syn in synonyms], range(num_labels)))
+    
+    # label to index mapping - synonym labels
+    label_index_offset = len(labels) - len(all_labels_to_combine)
+    for i, syn in enumerate(synonyms):
+        for l in syn:
+            label_dict[l] = i + label_index_offset
 
     return label_dict
 
@@ -321,5 +320,25 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
 
     else:
         raise NotImplemented
-
+    
     return object_label_dict, room_label_dict
+
+
+def _hydra_object_feature_converter(hydra_colormap_data, word2vec_model):
+    return lambda i: np.mean(
+        [word2vec_model[s] for s in hydra_colormap_data['name'][i].split("_") if s != "of"], axis=0,)
+
+
+def hydra_node_converter(object_feature_converter, room_feature_converter=lambda i:np.empty(0)):
+    def node_converter(G, x):
+        if x.layer == 2:    # object
+            return np.hstack((x.attributes.position, 
+                              x.attributes.bounding_box.max - x.attributes.bounding_box.min, 
+                              object_feature_converter(x.attributes.semantic_label).astype(x.attributes.position.dtype)))
+        elif x.layer == 4:  # room
+            return np.hstack((x.attributes.position, 
+                              x.attributes.bounding_box.max - x.attributes.bounding_box.min,
+                              room_feature_converter(x.attributes.semantic_label).astype(x.attributes.position.dtype)))
+        else:
+            raise NotImplemented
+    return node_converter
