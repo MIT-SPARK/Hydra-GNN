@@ -38,7 +38,7 @@ def test_get_room_object_dst(test_data_dir, tol=tol):
         assert np.linalg.norm(G_ro.get_node(node.id.value).attributes.bounding_box.max \
             - G.get_node(node.id.value).attributes.bounding_box.max) < tol
 
-    # check object is inside each room
+    # check position is inside of a room
     def _is_inside(pos, room_node):
         bbx_min = G_ro.get_node(room_node.id.value).attributes.bounding_box.min
         bbx_max = G_ro.get_node(room_node.id.value).attributes.bounding_box.max
