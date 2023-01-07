@@ -1,4 +1,6 @@
-from hydra_gnn.preprocess_dsgs import get_room_object_dsg, add_object_connectivity, hydra_node_converter, _hydra_object_feature_converter
+from hydra_gnn.preprocess_dsgs import get_room_object_dsg, add_object_connectivity, hydra_node_converter, \
+    _hydra_object_feature_converter, convert_label_to_y, OBJECT_LABELS, ROOM_LABELS
+from spark_dsg.mp3d import load_mp3d_info, add_gt_room_label
 import spark_dsg as dsg
 import numpy as np
 import warnings
@@ -111,15 +113,17 @@ def test_full_torch_feature_conversion(test_data_dir, tol=tol):
         colormap_data = pytest.colormap_data
         word2vec_model = pytest.word2vec_model
 
-    data_3 = G_ro.to_torch(use_heterogeneous=True, 
-                       node_converter=hydra_node_converter(
-                        object_feature_converter=_hydra_object_feature_converter(colormap_data, word2vec_model),
-                        room_feature_converter=lambda i: np.empty(0)))
+    data_3 = G_ro.to_torch(use_heterogeneous=True,
+                           node_converter=hydra_node_converter(
+                               object_feature_converter=_hydra_object_feature_converter(
+                                   colormap_data, word2vec_model),
+                               room_feature_converter=lambda i: np.empty(0)))
 
-    data_4 = G_ro.to_torch(use_heterogeneous=False, 
-                        node_converter=hydra_node_converter(
-                            object_feature_converter=_hydra_object_feature_converter(colormap_data, word2vec_model),
-                            room_feature_converter=lambda i: np.empty(300)))
+    data_4 = G_ro.to_torch(use_heterogeneous=False,
+                           node_converter=hydra_node_converter(
+                               object_feature_converter=_hydra_object_feature_converter(
+                                   colormap_data, word2vec_model),
+                               room_feature_converter=lambda i: np.empty(300)))
 
     assert data_3['rooms'].x.shape[1] == 6
     assert data_3['objects'].x.shape[1] == 306
@@ -140,3 +144,79 @@ def test_full_torch_feature_conversion(test_data_dir, tol=tol):
 
         feature = feature_converter(node.attributes.semantic_label)
         assert np.linalg.norm(np.array(data_3['objects'].x[i, 6:]) - feature) < tol
+
+
+def test_convert_label_to_y(test_data_dir):
+    test_json_file = test_data_dir / "x8F5xyUWy9e_0_gt_partial_dsg_1447.json"
+    gt_house_file = test_data_dir / "x8F5xyUWy9e.house"
+    if not (os.path.exists(test_json_file) and os.path.exists(gt_house_file)):
+        warnings.warn(UserWarning("test data file missing. -- skip test"))
+        return
+
+    if pytest.colormap_data is None or pytest.word2vec_model is None:
+        warnings.warn(UserWarning("data file(s) missing. -- skip test"))
+        return
+    else:
+        colormap_data = pytest.colormap_data
+        word2vec_model = pytest.word2vec_model
+    
+    # read test hydra scene graph, add room label using gt segmentation, extract room-object graph
+    G = dsg.DynamicSceneGraph.load(str(test_json_file))
+    dsg.add_bounding_boxes_to_layer(G, dsg.DsgLayers.ROOMS)
+    gt_house_info = load_mp3d_info(gt_house_file)
+    add_gt_room_label(G, gt_house_info, angle_deg=-90)
+    G_ro = get_room_object_dsg(G, verbose=False)
+
+    # expected results
+    object_synonyms = []
+    room_synonyms = [('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]
+    object_label_dict_exp = dict(zip(OBJECT_LABELS, range(len(OBJECT_LABELS))))
+    individually_mapped_room = [label for label in ROOM_LABELS \
+        if label not in ['a', 't', 'z', 'Z', 'x', 'p', '\x15']]
+    room_label_dict_exp = dict(zip(individually_mapped_room + ['a', 't', 'z', 'Z', 'x', 'p', '\x15'], \
+        list(range(len(individually_mapped_room))) +  [len(individually_mapped_room)] * 2 + \
+            [len(individually_mapped_room)+1] * 5))
+    
+    def _check_dict(dict1, dict_2):
+        assert len(dict1) == len(dict_2)
+        assert all((dict1.get(k) == v for k, v in dict_2.items()))
+
+    room_y_exp = [12, 23, 3, 23, 23]
+    object_y_exp = [0, 3, 22, 13, 0, 1, 9, 27, 9, 10, 6, 0, 0, 20, 9, 27, 6, 20, 3, 16, 10, 14, 15, 19, 26, 
+                    27, 0, 0, 13, 22, 1, 9, 22, 6, 10, 27, 10, 10, 14, 19, 0, 0, 0, 25, 16, 3, 6, 1, 0, 27, 
+                    25, 26, 15, 25, 3, 1, 22, 22, 1, 10, 22, 10]
+    
+    def _check_list(list1, list2):
+        assert len(list1) == len(list2)
+        assert all((list1[i] == list2[i] for i in range(len(list1))))
+
+    # setup 1: convert room-object graph to homogeneous torch data
+    data_homogeneous = G_ro.to_torch(use_heterogeneous=False,
+                                     node_converter=hydra_node_converter(
+                                         object_feature_converter=_hydra_object_feature_converter(
+                                             colormap_data, word2vec_model),
+                                         room_feature_converter=lambda i: np.empty(300)))
+    object_label_dict, room_label_dict = convert_label_to_y(
+        data_homogeneous, object_labels=OBJECT_LABELS, room_labels=ROOM_LABELS, 
+        object_synonyms=object_synonyms, room_synonyms=room_synonyms)
+    _check_dict(object_label_dict, object_label_dict_exp)
+    _check_dict(room_label_dict, room_label_dict_exp)
+
+    object_y = data_homogeneous.y[data_homogeneous.node_masks[2]]
+    room_y = data_homogeneous.y[data_homogeneous.node_masks[4]]
+    _check_list(object_y.tolist(), object_y_exp)
+    _check_list(room_y.tolist(), room_y_exp)
+
+    # setup 2: convert room-object graph to heterogeneous torch data
+    data_heterogeneous = G_ro.to_torch(use_heterogeneous=True,
+                                       node_converter=hydra_node_converter(
+                                           object_feature_converter=_hydra_object_feature_converter(
+                                               colormap_data, word2vec_model),
+                                           room_feature_converter=lambda i: np.empty(0)))
+    object_label_dict, room_label_dict = convert_label_to_y(
+        data_heterogeneous, object_labels=OBJECT_LABELS, room_labels=ROOM_LABELS, 
+        object_synonyms=object_synonyms, room_synonyms=room_synonyms)
+    _check_dict(object_label_dict, object_label_dict_exp)
+    _check_dict(room_label_dict, room_label_dict_exp)
+    _check_list(data_heterogeneous['rooms'].y.tolist(), room_y_exp)
+    _check_list(data_heterogeneous['objects'].y.tolist(), object_y_exp)
