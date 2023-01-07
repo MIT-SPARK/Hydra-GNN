@@ -257,6 +257,10 @@ def get_room_object_dsg(G, verbose=False):
                 object_node.id.value, G.get_node(neighboring_dist[0][1]).get_parent())
             if verbose:
                 print(f"{object_node.id} - indirect edge")
+    
+    if verbose:
+        print(f"Found {len(invalid_objects)} invalid objects. " + \
+            f"Object ids: {[node.id for node in invalid_objects]}")
 
     return G_room_object
 

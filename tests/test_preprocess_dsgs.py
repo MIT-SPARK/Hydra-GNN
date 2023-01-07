@@ -7,6 +7,53 @@ import pytest
 
 tol = 1e-5
 
+
+def test_get_room_object_dst(test_data_dir, tol=tol):
+    test_json_file = test_data_dir / "x8F5xyUWy9e_0_gt_partial_dsg_1447.json"
+    if not os.path.exists(test_json_file):
+        warnings.warn(UserWarning("test data file missing. -- skip test"))
+        return
+
+    # read test hydra scene graph and construct room bounding box
+    G = dsg.DynamicSceneGraph.load(str(test_json_file))
+    dsg.add_bounding_boxes_to_layer(G, dsg.DsgLayers.ROOMS)
+
+    # extract room-object graph
+    G_ro = get_room_object_dsg(G, verbose=False)
+
+    # check number of nodes and edges
+    assert G.get_layer(dsg.DsgLayers.ROOMS).num_nodes() == G_ro.get_layer(dsg.DsgLayers.ROOMS).num_nodes()
+    assert G.get_layer(dsg.DsgLayers.ROOMS).num_edges() == G_ro.get_layer(dsg.DsgLayers.ROOMS).num_edges()
+    assert G.get_layer(dsg.DsgLayers.OBJECTS).num_nodes() >= G_ro.get_layer(dsg.DsgLayers.OBJECTS).num_nodes()
+    assert G_ro.get_layer(dsg.DsgLayers.OBJECTS).num_edges() == 0
+
+    # check node attributes
+    def _check_node_attributes(node):
+        assert G_ro.get_node(node.id.value).attributes.semantic_label == \
+            G.get_node(node.id.value).attributes.semantic_label
+        assert np.linalg.norm(G_ro.get_node(node.id.value).attributes.position \
+            - G.get_node(node.id.value).attributes.position) < tol
+        assert np.linalg.norm(G_ro.get_node(node.id.value).attributes.bounding_box.min \
+            - G.get_node(node.id.value).attributes.bounding_box.min) < tol
+        assert np.linalg.norm(G_ro.get_node(node.id.value).attributes.bounding_box.max \
+            - G.get_node(node.id.value).attributes.bounding_box.max) < tol
+
+    # check object is inside each room
+    def _is_inside(pos, room_node):
+        bbx_min = G_ro.get_node(room_node.id.value).attributes.bounding_box.min
+        bbx_max = G_ro.get_node(room_node.id.value).attributes.bounding_box.max
+        assert np.all(pos >= bbx_min)
+        assert np.all(pos <= bbx_max)
+
+    for room_node in G_ro.get_layer(dsg.DsgLayers.ROOMS).nodes:
+        _check_node_attributes(room_node)
+    for object_node in G_ro.get_layer(dsg.DsgLayers.OBJECTS).nodes:
+        _check_node_attributes(object_node)
+        if G.get_node(object_node.id.value).has_parent():
+            place_node_in_G = G.get_node(G.get_node(object_node.id.value).get_parent())
+            _is_inside(
+                place_node_in_G.attributes.position, G_ro.get_node(object_node.get_parent()))
+
 def test_hydra_object_feature_converter(tol=tol):
     if pytest.colormap_data is None or pytest.word2vec_model is None:
         warnings.warn(UserWarning("data file(s) missing. -- skip test"))
