@@ -1,5 +1,5 @@
 from hydra_gnn.preprocess_dsgs import get_room_object_dsg, add_object_connectivity, hydra_node_converter, \
-    _hydra_object_feature_converter, convert_label_to_y, OBJECT_LABELS, ROOM_LABELS
+    hydra_object_feature_converter, convert_label_to_y, OBJECT_LABELS, ROOM_LABELS
 from spark_dsg.mp3d import load_mp3d_info, add_gt_room_label
 import spark_dsg as dsg
 import numpy as np
@@ -65,7 +65,7 @@ def test_hydra_object_feature_converter(tol=tol):
         word2vec_model = pytest.word2vec_model
 
     # feature converter should convert hydra integer label to the corresponding 300-dim word2vec feature vector
-    feature_converter = _hydra_object_feature_converter(colormap_data, word2vec_model)
+    feature_converter = hydra_object_feature_converter(colormap_data, word2vec_model)
     assert(np.linalg.norm(feature_converter(3) - word2vec_model['chair']) < tol)
     assert(np.linalg.norm(feature_converter(13) - (word2vec_model['chest'] + word2vec_model['drawers'])/2) < tol)
     assert(np.linalg.norm(feature_converter(22) - (word2vec_model['tv'] + word2vec_model['monitor'])/2) < tol)
@@ -115,13 +115,13 @@ def test_full_torch_feature_conversion(test_data_dir, tol=tol):
 
     data_3 = G_ro.to_torch(use_heterogeneous=True,
                            node_converter=hydra_node_converter(
-                               object_feature_converter=_hydra_object_feature_converter(
+                               object_feature_converter=hydra_object_feature_converter(
                                    colormap_data, word2vec_model),
                                room_feature_converter=lambda i: np.empty(0)))
 
     data_4 = G_ro.to_torch(use_heterogeneous=False,
                            node_converter=hydra_node_converter(
-                               object_feature_converter=_hydra_object_feature_converter(
+                               object_feature_converter=hydra_object_feature_converter(
                                    colormap_data, word2vec_model),
                                room_feature_converter=lambda i: np.empty(300)))
 
@@ -135,7 +135,7 @@ def test_full_torch_feature_conversion(test_data_dir, tol=tol):
         assert np.linalg.norm(np.array(data_4.x[data_4.node_masks[4], :][i, 0:3]) - node.attributes.position) < tol
         assert np.linalg.norm(np.array(data_4.x[data_4.node_masks[4], :][i, 6:0])) < tol
 
-    feature_converter = _hydra_object_feature_converter(colormap_data, word2vec_model)
+    feature_converter = hydra_object_feature_converter(colormap_data, word2vec_model)
     for i, node in enumerate(G_ro.get_layer(dsg.DsgLayers.OBJECTS).nodes):
         size = node.attributes.bounding_box.max - node.attributes.bounding_box.min
         assert np.all(size > 0) # size is positive
@@ -193,7 +193,7 @@ def test_convert_label_to_y(test_data_dir):
     # setup 1: convert room-object graph to homogeneous torch data
     data_homogeneous = G_ro.to_torch(use_heterogeneous=False,
                                      node_converter=hydra_node_converter(
-                                         object_feature_converter=_hydra_object_feature_converter(
+                                         object_feature_converter=hydra_object_feature_converter(
                                              colormap_data, word2vec_model),
                                          room_feature_converter=lambda i: np.empty(300)))
     object_label_dict, room_label_dict = convert_label_to_y(
@@ -210,7 +210,7 @@ def test_convert_label_to_y(test_data_dir):
     # setup 2: convert room-object graph to heterogeneous torch data
     data_heterogeneous = G_ro.to_torch(use_heterogeneous=True,
                                        node_converter=hydra_node_converter(
-                                           object_feature_converter=_hydra_object_feature_converter(
+                                           object_feature_converter=hydra_object_feature_converter(
                                                colormap_data, word2vec_model),
                                            room_feature_converter=lambda i: np.empty(0)))
     object_label_dict, room_label_dict = convert_label_to_y(

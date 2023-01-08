@@ -328,7 +328,7 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
     return object_label_dict, room_label_dict
 
 
-def _hydra_object_feature_converter(hydra_colormap_data, word2vec_model):
+def hydra_object_feature_converter(hydra_colormap_data, word2vec_model):
     return lambda i: np.mean(
         [word2vec_model[s] for s in hydra_colormap_data['name'][i].split("_") if s != "of"], axis=0,)
 
