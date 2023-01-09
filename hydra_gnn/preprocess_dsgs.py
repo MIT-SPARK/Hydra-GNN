@@ -227,8 +227,8 @@ def get_room_object_dsg(G, verbose=False):
     for object_node in G.get_layer(dsg.DsgLayers.OBJECTS).nodes:
         if not object_node.has_parent():
             invalid_objects.append(object_node)
-            warnings.warn(
-                f"{object_node.id} has no parent node in the input DSG.")
+            if verbose:
+                print(f"{object_node.id} has no parent node in the input DSG.")
             continue
 
         # insert edge through object -> place -> room edges in G
@@ -312,7 +312,7 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
         torch_data.y[torch_data.node_masks[4]] = torch.tensor(room_y)
 
     elif isinstance(torch_data, HeteroData):
-        assert len(torch_data.node_types) == 2
+        assert len(torch_data.node_types) == 2, len(torch_data.node_types)
         assert 'objects' in torch_data.node_types
         assert 'rooms' in torch_data.node_types
 
