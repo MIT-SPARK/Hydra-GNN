@@ -72,6 +72,10 @@ def test_Hydra_mp3d_data(test_data_dir):
     assert len(room_label_dict) == 31
     assert all(hydra_label in ROOM_LABELS for hydra_label in room_label_dict.keys())
     assert all(hydra_label in range(26) for hydra_label in room_label_dict.values())
+    # check numbers
+    assert data.num_node_features() == (306, 306)
+    assert data.num_room_labels() == 26
+    assert data.num_object_labels() == 28
 
     # setup 2: convert room-object graph to heterogeneous torch data
     data.compute_torch_data(use_heterogeneous=True,
@@ -93,7 +97,10 @@ def test_Hydra_mp3d_data(test_data_dir):
     assert len(room_label_dict) == 31
     assert all(hydra_label in ROOM_LABELS for hydra_label in room_label_dict.keys())
     assert all(hydra_label in range(26) for hydra_label in room_label_dict.values())
-
+    # check numbers
+    assert data.num_node_features() == (6, 306)
+    assert data.num_room_labels() == 26
+    assert data.num_object_labels() == 28
 
 def test_Hydra_mp3d_dataset(test_data_dir):
     test_json_file1 = test_data_dir / "x8F5xyUWy9e_0_gt_partial_dsg_1447.json"

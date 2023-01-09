@@ -43,6 +43,20 @@ class Hydra_mp3d_data:
             convert_label_to_y(self._torch_data, object_synonyms=object_synonyms,
                 room_synonyms=room_synonyms)
     
+    def num_node_features(self):
+        if self._torch_data is None:
+            return None
+        elif self.is_heterogeneous():
+            return (self._torch_data['rooms'].num_node_features, self._torch_data['objects'].num_node_features)
+        else:
+            return (self._torch_data.num_node_features, self._torch_data.num_node_features)
+    
+    def num_room_labels(self):
+        return max(self._room_label_dict.values()) + 1
+
+    def num_object_labels(self):
+        return max(self._object_label_dict.values()) + 1
+
     def is_heterogeneous(self):
         if self._torch_data is None:
             return None
