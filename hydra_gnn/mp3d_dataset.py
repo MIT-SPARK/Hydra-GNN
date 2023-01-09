@@ -68,6 +68,10 @@ class Hydra_mp3d_data:
     def get_torch_data(self):
         return self._torch_data
 
+    def clear_dsg(self):
+        self._G = None
+        self._G_ro = None
+
 
 class Hydra_mp3d_dataset(torch.utils.data.Dataset):
     def __init__(self, split):
