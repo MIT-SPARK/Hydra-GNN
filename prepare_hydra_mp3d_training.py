@@ -28,6 +28,7 @@ if __name__ == "__main__":
                         help="Store torch graph as HeteroData")
     args = parser.parse_args()
     print("Saving torch graphs as Hetero data:", args.use_hetero)
+    print("Output directory:", args.output_dir)
     data_list = []
 
     colormap_data = pd.read_csv(COLORMAP_DATA_PATH, delimiter=',')
@@ -36,7 +37,7 @@ if __name__ == "__main__":
     if args.use_hetero:
         room_feature_converter = lambda i: np.empty(0)
     else:
-        room_feature_converter = lambda i: np.empty(300)
+        room_feature_converter = lambda i: np.zeros(300)
 
     trajectory_dirs = os.listdir(HYDRA_TRAJ_DIR)
     skipped_json_files = {'none': [], 'no room': [], 'no object': []}
