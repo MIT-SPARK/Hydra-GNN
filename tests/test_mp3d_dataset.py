@@ -1,6 +1,6 @@
 from hydra_gnn.preprocess_dsgs import hydra_node_converter, hydra_object_feature_converter, \
     OBJECT_LABELS, ROOM_LABELS
-from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_dataset
+from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_dataset, EDGE_TYPES
 from spark_dsg.mp3d import load_mp3d_info
 import spark_dsg as dsg
 import torch
@@ -101,6 +101,47 @@ def test_Hydra_mp3d_data(test_data_dir):
     assert data.num_node_features() == (6, 306)
     assert data.num_room_labels() == 26
     assert data.num_object_labels() == 28
+
+
+def test_fill_missing_edge_index():
+    # data with 1 room
+    data = HeteroData()
+    data['rooms'].x = torch.rand((1, 6))
+    data['objects'].x = torch.rand((3, 306))
+    object_edge = torch.tensor([[0, 1, 1, 2, 2, 0],
+                                [1, 0, 2, 1, 0, 2]])
+    room_object_edge = torch.tensor([[0, 0, 0],
+                                     [0, 1, 2]])
+    data['objects', 'objects_to_objects', 'objects'].edge_index = object_edge
+    data['rooms', 'rooms_to_objects', 'objects'].edge_index = room_object_edge
+    
+    Hydra_mp3d_data.fill_missing_edge_index(data, edge_types=EDGE_TYPES)
+    assert ('rooms', 'rooms_to_rooms', 'rooms') in data.edge_index_dict
+    assert data[('rooms', 'rooms_to_rooms', 'rooms')].num_edges == 0
+    assert ('objects', 'objects_to_rooms', 'rooms') in data.edge_index_dict
+    assert torch.all(data[('objects', 'objects_to_rooms', 'rooms')].edge_index == \
+        data['rooms', 'rooms_to_objects', 'objects'].edge_index.flip([0])), data[('object', 'objects_to_rooms', 'rooms')].edge_index
+
+    # data with 2 room
+    data = HeteroData()
+    data['rooms'].x = torch.rand((2, 6))
+    data['objects'].x = torch.rand((4, 306))
+    room_edge = torch.tensor([[0, 1],
+                              [1, 0]])
+    object_edge = torch.tensor([[0, 1, 1, 2, 2, 0],
+                                [1, 0, 2, 1, 0, 2]])
+    room_object_edge = torch.tensor([[0, 0, 0, 1],
+                                     [0, 1, 2, 3]])
+    data['rooms', 'rooms_to_rooms', 'rooms'].edge_index = room_edge
+    data['objects', 'objects_to_objects', 'objects'].edge_index = object_edge
+    data['rooms', 'rooms_to_objects', 'objects'].edge_index = room_object_edge
+    
+    Hydra_mp3d_data.fill_missing_edge_index(data, edge_types=EDGE_TYPES)
+    assert data[('rooms', 'rooms_to_rooms', 'rooms')].num_edges == 2
+    assert ('objects', 'objects_to_rooms', 'rooms') in data.edge_index_dict
+    assert torch.all(data[('objects', 'objects_to_rooms', 'rooms')].edge_index == \
+        data['rooms', 'rooms_to_objects', 'objects'].edge_index.flip([0]))
+
 
 def test_Hydra_mp3d_dataset(test_data_dir):
     test_json_file1 = test_data_dir / "x8F5xyUWy9e_0_gt_partial_dsg_1447.json"
