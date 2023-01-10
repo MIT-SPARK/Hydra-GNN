@@ -6,6 +6,12 @@ import torch.utils
 from torch_geometric.data import HeteroData
 
 
+EDGE_TYPES = [('objects', 'objects_to_objects', 'objects'),
+              ('rooms', 'rooms_to_rooms', 'rooms'),
+              ('objects', 'objects_to_rooms', 'rooms'),
+              ('rooms', 'rooms_to_objects', 'objects')]
+
+
 class Hydra_mp3d_data:
     def __init__(self, scene_id, trajectory_id, num_frames, file_path) -> None:
         assert os.path.exists(file_path)
@@ -32,11 +38,33 @@ class Hydra_mp3d_data:
         add_object_connectivity(self._G_ro, threshold_near=threshold_near,
             threshold_on=threshold_on, max_near=max_near)
 
+    @staticmethod
+    def fill_missing_edge_index(torch_data, edge_types, dtype=torch.int64):
+        for source_type, edge_name, target_type in edge_types:
+            if (source_type, edge_name, target_type) in torch_data.edge_index_dict.keys():
+                continue
+            if source_type == target_type:
+                print(source_type)
+                torch_data[source_type, edge_name, target_type].edge_index = \
+                    torch.empty((2, 0), dtype=dtype)
+            elif (target_type, '_'.join(edge_name.split('_')[::-1]), source_type) in \
+                torch_data.edge_index_dict.keys():
+                print('here', edge_name)
+                torch_data[source_type, edge_name, target_type].edge_index = \
+                    torch_data[target_type, '_'.join(edge_name.split('_')[::-1]), source_type].edge_index.flip([0])
+            else:
+                print(edge_name)
+                torch_data[source_type, edge_name, target_type].edge_index = \
+                    torch.empty((2, 0), dtype=dtype)
+
     def compute_torch_data(self, use_heterogeneous: bool, node_converter, object_synonyms=[],
                            room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')] ):
         # convert room-object dsg to torch graph
         self._torch_data = self._G_ro.to_torch(use_heterogeneous=use_heterogeneous,
             node_converter=node_converter)
+        # for HeteroData, make sure all edges are there
+        if use_heterogeneous:
+            self.fill_missing_edge_index(self._torch_data, EDGE_TYPES)
 
         # convert hydra semantic label to torch training label
         self._object_label_dict, self._room_label_dict = \
