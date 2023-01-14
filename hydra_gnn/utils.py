@@ -2,6 +2,10 @@ import plotly.graph_objects as go
 import plotly.express as px
 import torch_geometric
 import os.path
+from typing import Any, Sequence, Iterator
+from io import IOBase
+import itertools
+import numpy as np
 
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -13,6 +17,18 @@ COLORMAP_DATA_PATH = os.path.join(DATA_DIR, "colormap.csv")
 WORD2VEC_MODEL_PATH = os.path.join(DATA_DIR, "GoogleNews-vectors-negative300.bin")
 
 
+def print_log(string, file):
+    print(string)
+    print(string, file=file)
+
+
+def update_existing_keys(dict_to_update, dict_input):
+    dict_to_update.update({k:v for k, v in dict_input.items() if k in dict_to_update.keys()})
+
+
+# -----------------------------------------------------------------------------
+# Plot heterogenous torch data
+# -----------------------------------------------------------------------------
 def _filter_empty_nodes(torch_data):
     return lambda node_type: torch_data[node_type].num_nodes is not None and torch_data[node_type].num_nodes > 0
 
@@ -81,3 +97,55 @@ def plot_heterogeneous_graph(torch_data, node_filter_func=_filter_empty_nodes, *
         fig.add_trace(plotly_edge)
 
     return fig
+
+
+# -----------------------------------------------------------------------------
+# Parameter sweep
+# https://github.com/elcorto/psweep
+# -----------------------------------------------------------------------------
+def is_seq(seq) -> bool:
+    if (
+        isinstance(seq, str)
+        or isinstance(seq, IOBase)
+        or isinstance(seq, dict)
+    ):
+        return False
+    else:
+        try:
+            iter(seq)
+            return True
+        except TypeError:
+            return False
+
+def flatten(seq):
+    for item in seq:
+        if not is_seq(item):
+            yield item
+        else:
+            for subitem in flatten(item):
+                yield subitem
+
+def plist(name: str, seq: Sequence[Any]):
+    return [{name: entry} for entry in seq]
+
+def merge_dicts(args: Sequence[dict]):
+    dct = {}
+    assert is_seq(args), f"input args={args} is no sequence"
+    for entry in args:
+        assert isinstance(entry, dict), f"entry={entry} is no dict"
+        dct.update(entry)
+    return dct
+
+
+def itr2params(loops: Iterator[Any]):
+    ret = [merge_dicts(flatten(entry)) for entry in loops]
+    lens = list(map(len, ret))
+    assert (
+        len(np.unique(lens)) == 1
+    ), f"not all psets have same length"
+    return ret
+
+
+def pgrid(*plists):
+    assert is_seq(plists), f"input plists={plists} is no sequence"
+    return itr2params(itertools.product(*plists))
