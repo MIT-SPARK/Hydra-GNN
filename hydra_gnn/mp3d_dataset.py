@@ -59,14 +59,22 @@ class Hydra_mp3d_data:
         # convert room-object dsg to torch graph
         self._torch_data = self._G_ro.to_torch(use_heterogeneous=use_heterogeneous,
             node_converter=node_converter)
-        # for HeteroData, make sure all edges are there
-        if use_heterogeneous:
+        
+        if use_heterogeneous:   # for HeteroData, make sure all edges are there
             self.fill_missing_edge_index(self._torch_data, EDGE_TYPES)
+        else:
+            self._torch_data.room_mask = self._torch_data['node_masks'][4]
+            delattr(self._torch_data, 'node_masks')
 
         # convert hydra semantic label to torch training label
         self._object_label_dict, self._room_label_dict = \
             convert_label_to_y(self._torch_data, object_synonyms=object_synonyms,
                 room_synonyms=room_synonyms)
+    
+    def to_homogeneous(self):
+        if isinstance(self._torch_data, HeteroData):
+            self._torch_data = self._torch_data.to_homogeneous(add_edge_type=False)
+            self._torch_data.room_mask = (self._torch_data.node_type == 1)
     
     def num_node_features(self):
         if self._torch_data is None:
