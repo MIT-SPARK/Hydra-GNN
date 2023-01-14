@@ -152,14 +152,14 @@ def get_room_graph(dsg_nx):
     return dsg_nx.subgraph(_room_idx), _room_idx
 
 
-def generate_component_jth(dsg_nx_component, component_type, room_node_data=None, verbose=False):
+def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, room_node_data=None, verbose=False):
     """
     generates jth and root_nodes, given either room graph or objects graph in dsg_nx format
 
     """
     # parameters
     treewidth_bound = 10
-    zero_feature = [0.0] * 6
+    zero_feature = [0.0] * num_zero_padding
     pos_zeros = [0.0] * 3
 
     assert component_type in ["rooms", "objects"]
@@ -345,6 +345,7 @@ def generate_htree(dsg_torch, verbose=False):
         # extracting H-tree of the room graph
         dsg_component_room_jth, _room_root_nodes = generate_component_jth(dsg_nx_component=dsg_component_room,
                                                                           component_type="rooms",
+                                                                          num_zero_padding=dsg_torch['rooms'].num_features,
                                                                           verbose=verbose)
 
         # create a Htree
@@ -363,10 +364,11 @@ def generate_htree(dsg_torch, verbose=False):
 
                 # extracting H-tree of the object graph component
                 object_component_jth, _object_root_nodes = \
-                    generate_component_jth(dsg_nx_component=object_graph_component,
-                                           component_type="objects",
-                                           room_node_data=(r, dsg_component.nodes[r]),
-                                           verbose=verbose)
+                      generate_component_jth(dsg_nx_component=object_graph_component,
+                                             component_type="objects",
+                                             room_node_data=(r, dsg_component.nodes[r]),
+                                             num_zero_padding=dsg_torch['objects'].num_features,
+                                             verbose=verbose)
 
                 # adding to _htree
                 _htree.add_object_jth(object_jth=object_component_jth,
