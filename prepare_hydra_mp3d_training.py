@@ -22,6 +22,8 @@ room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('output_filename', default='data.pkl',
+                        help="output file name")
     parser.add_argument('--output_dir', default=os.path.join(PROJECT_DIR, 'output/preprocessed_mp3d'),
                         help="training and validation ratio")
     parser.add_argument('--use_hetero', action='store_true', 
@@ -29,13 +31,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print("Saving torch graphs as Hetero data:", args.use_hetero)
     print("Output directory:", args.output_dir)
+    print("Output data files:", args.output_filename, 'params.yaml', 'skipped_partial_scenes.yaml')
     data_list = []
 
     colormap_data = pd.read_csv(COLORMAP_DATA_PATH, delimiter=',')
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(WORD2VEC_MODEL_PATH, binary=True)
     object_feature_converter=hydra_object_feature_converter(colormap_data, word2vec_model)
     if args.use_hetero:
-        room_feature_converter = lambda i: np.empty(0)
+        room_feature_converter = lambda i: np.zeros(300)
     else:
         room_feature_converter = lambda i: np.zeros(300)
 
@@ -84,7 +87,7 @@ if __name__ == "__main__":
             data.clear_dsg()    # remove hydra dsg for output
             data_list.append(data)
     
-    output_filename = 'heterogeneous.pkl' if args.use_hetero else 'homogeneous.pkl'
+    output_filename = args.output_filename
     with open(os.path.join(args.output_dir, output_filename), 'wb') as output_file:
         pickle.dump(data_list, output_file)
 
