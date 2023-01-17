@@ -298,7 +298,7 @@ def generate_htree(dsg_torch, verbose=False):
     dsg_nx = torch_dsg_to_nx(dsg_torch)
 
     # iterating over each connected component in dsg_nx
-    htree_list = []
+    htree_nx = nx.Graph()     # add connected component to this nx graph object for final output
     for i, c in enumerate(nx.connected_components(dsg_nx)):
 
         # extracting connected component, from node index list c
@@ -310,9 +310,9 @@ def generate_htree(dsg_torch, verbose=False):
         # extracting H-tree of the room graph
         dsg_component_room_jth, _room_root_nodes = \
             generate_component_jth(dsg_nx_component=dsg_component_room,
-                                                                          component_type="rooms",
-                                                                          num_zero_padding=dsg_torch['rooms'].num_features,
-                                                                          verbose=verbose)
+                                   component_type="rooms",
+                                   num_zero_padding=dsg_torch['rooms'].num_features,
+                                   verbose=verbose)
 
         # create a Htree
         _htree = HTree(room_jth=dsg_component_room_jth, room_root_nodes=_room_root_nodes)
@@ -344,10 +344,9 @@ def generate_htree(dsg_torch, verbose=False):
         if verbose:
             print(f"Component {i}: H-tree contains {_htree.jth.number_of_nodes()} nodes "
                     f"and {_htree.jth.number_of_edges()} edges.")
-        htree_list.append(_htree)
+        htree_nx = nx.disjoint_union(htree_nx, _htree.jth)
 
-    return htree_list
-
+    return htree_nx
 
 if __name__ == "__main__":
 
@@ -371,19 +370,21 @@ if __name__ == "__main__":
             print(f"DSG contains {dsg_torch.num_nodes} nodes.")
 
             # compute h-trees
-            dsg_jth_list = generate_htree(dsg_torch, verbose=False)
+            htree_nx = generate_htree(dsg_torch, verbose=False)
+            htree_torch = nx_htree_to_torch(htree_nx)
 
-            print(f"DSG is divided into {len(dsg_jth_list)} disconnected components.")
-            for c in range(len(dsg_jth_list)):
-                print(f"Component {c}: H-tree contains {dsg_jth_list[c].jth.number_of_nodes()} nodes "
-                      f"and {dsg_jth_list[c].jth.number_of_edges()} edges.")
+            # dsg_jth_list = generate_htree(dsg_torch, verbose=False)
+            # print(f"DSG is divided into {len(dsg_jth_list)} disconnected components.")
+            # for c in range(len(dsg_jth_list)):
+            #     print(f"Component {c}: H-tree contains {dsg_jth_list[c].jth.number_of_nodes()} nodes "
+            #           f"and {dsg_jth_list[c].jth.number_of_edges()} edges.")
 
-                if dsg_jth_list[c].jth.number_of_edges() < 1:
-                    print("We skip H-tree conversion to torch_geometric. H-tree has no edges.")
-                else:
-                    # convert to torch_geometric.data.HeteroData
-                    dsg_jth_torch = nx_dsg_jth_to_torch(dsg_jth_list[c].jth)
-                    print(f"Component {c}: H-tree converted to torch_geometric.data.HeteroData")
+            #     if dsg_jth_list[c].jth.number_of_edges() < 1:
+            #         print("We skip H-tree conversion to torch_geometric. H-tree has no edges.")
+            #     else:
+            #         # convert to torch_geometric.data.HeteroData
+            #         dsg_jth_torch = jth_to_torch(dsg_jth_list[c].jth)
+            #         print(f"Component {c}: H-tree converted to torch_geometric.data.HeteroData")
 
             print("---" * 40)
 
