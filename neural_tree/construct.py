@@ -110,11 +110,6 @@ def nx_htree_to_torch(jth_nx):
     return jth_torch
 
 
-def draw_dsg_jth(jth_nx, attribute_type='clique_has'):
-    label_dict = {idx: data_dict[attribute_type] for idx, data_dict in jth_nx.nodes.items()}
-    nx.draw(jth_nx, labels=label_dict, with_labels=True)
-
-
 def torch_dsg_to_nx(dsg_torch):
     """
     converts heterogeneous dsg_nx to a networkx graph, with object and room nodes labeled with node_type
