@@ -33,7 +33,7 @@ HTREE_POOL_EDGE_TYPES = [('object', 'o_to_ov', 'object_virtual'),
 
 def torch_dsg_to_nx(dsg_torch):
     """
-    converts heterogeneous dsg_nx to a networkx graph, with object and room nodes labeled with node_type
+    Converts heterogeneous dsg_nx to a networkx graph, with object and room nodes labeled with node_type
     """
     # convert to networkx
     _g = dsg_torch.to_homogeneous()
@@ -51,7 +51,7 @@ def torch_dsg_to_nx(dsg_torch):
 
 def get_room_graph(dsg_nx):
     """
-    extracts room graph from a networkx dsg.
+    Extracts room graph from a networkx dsg.
     """
     room_idx_list = [idx for idx in dsg_nx.nodes \
         if dsg_nx.nodes[idx]['node_type'] == 'room']
@@ -61,7 +61,7 @@ def get_room_graph(dsg_nx):
 
 def get_object_graph(dsg_nx, room_idx):
     """
-    extracts object graph from a networkx dsg for a given room index.
+    Extracts object graph from a networkx dsg for a given room index.
     """
     object_idx_list = [idx for idx in dsg_nx.neighbors(room_idx) \
         if dsg_nx.nodes[idx]['node_type'] == 'object']
@@ -72,14 +72,11 @@ def get_object_graph(dsg_nx, room_idx):
 def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, room_node_data=None, \
     treewidth_bound=10, verbose=False):
     """
-    generates jth and root_nodes, given either room graph or objects graph in dsg_nx format
+    Generates jth and root_nodes, given either room graph or objects graph in dsg_nx format
     """
-    # parameters
-    
+    assert component_type in ["rooms", "objects"]
     zero_feature = [0.0] * num_zero_padding
     zero_pos = [0.0] * 3
-
-    assert component_type in ["rooms", "objects"]
 
     if component_type == "rooms":
         # extracting H-tree of the room graph
@@ -164,7 +161,7 @@ class HTree:
         # relabeling object_jth
         new_labels = dict(zip(range(g.number_of_nodes()), \
             range(self.num_nodes, self.num_nodes + g.number_of_nodes())))
-
+        
         g = nx.relabel_nodes(g, new_labels)
         _roots = [new_labels[i] for i in _root_nodes]
 
@@ -188,7 +185,6 @@ class HTree:
                 self.jth.nodes[_root_node]['clique_has'] = [self.jth.nodes[_root_node]['clique_has']]
 
             if room_idx in self.jth.nodes[_root_node]['clique_has']:
-
                 g, _roots = self._reindex_and_compose(object_jth.copy(), object_root_nodes)
 
                 for _object_root_idx in _roots:
@@ -197,7 +193,7 @@ class HTree:
 
 def generate_htree(dsg_torch, verbose=False):
     """
-    takes in heterogeneous dsg_torch and generates h-tree using the sequential procedure.
+    Takes in heterogeneous dsg_torch and generates h-tree using the sequential procedure.
     """
 
     # converting to networkx
@@ -221,7 +217,7 @@ def generate_htree(dsg_torch, verbose=False):
                                    verbose=verbose)
         # create a Htree
         _htree = HTree(room_jth=dsg_component_room_jth, room_root_nodes=room_root_nodes)
-
+    
         # extracting jth of the object graphs in a room
         for r in room_idx:
 
@@ -235,17 +231,17 @@ def generate_htree(dsg_torch, verbose=False):
 
                 # extracting H-tree of the object graph component
                 object_component_jth, object_root_nodes = \
-                      generate_component_jth(dsg_nx_component=object_graph_component,
-                                             component_type="objects",
-                                             room_node_data=(r, dsg_component.nodes[r]),
-                                             num_zero_padding=dsg_torch['objects'].num_features,
-                                             verbose=verbose)
+                    generate_component_jth(dsg_nx_component=object_graph_component,
+                                           component_type="objects",
+                                           room_node_data=(r, dsg_component.nodes[r]),
+                                           num_zero_padding=dsg_torch['objects'].num_features,
+                                           verbose=verbose)
 
                 # adding to _htree
                 _htree.add_object_jth(object_jth=object_component_jth,
                                       object_root_nodes=object_root_nodes,
                                       room_idx=r)
-                
+
         # if there is only one room node in this connected component, change room node clique_has attribute to int
         if len(room_idx) == 1:
             assert _htree.jth.nodes[0]['type'] == 'node'
@@ -262,11 +258,48 @@ def generate_htree(dsg_torch, verbose=False):
     return htree_nx.to_directed()
 
 
+def add_virtual_node_to_htree(htree_nx):
+    """
+    Add virtual nodes which are copies of the original dsg, connect corresponding leaf nodes in htree to the 
+    virtual nodes via pooling edges, and connect virtual nodes to the clique nodes via init edges.
+    The pooling edges are used to pool final node hidden states and the init edges are to initialize clique features.
+    """
+    assert 'virtual' not in [data_dict['type'] for data_dict in htree_nx.nodes.values()], \
+        "Virtual node already in input graph."
 
-def nx_htree_to_torch(htree_nx, node_types=HTREE_NODE_TYPES, edge_types=HTREE_EDGE_TYPES, \
+    # get leaf and clique nodes indices in the origianl input htree data
+    leaf_nodes = [idx for idx, data_dict in htree_nx.nodes.items() if data_dict['type'] == 'node']
+    clique_nodes = [idx for idx, data_dict in htree_nx.nodes.items() if data_dict['type'] == 'clique']
+
+    idx_offset = htree_nx.number_of_nodes() # index offset for virtual nodes
+    assert all((idx in range(idx_offset) for idx in htree_nx.nodes)), \
+        "Input graph must have nodes labeled using consecutive integers, try nxconvert_node_labels_to_integers."
+
+    # add virtual nodes and connect leaf nodes to virtual nodes
+    for leaf_idx in leaf_nodes:
+        node_data_dict = htree_nx.nodes[leaf_idx]
+        virtual_node_idx = node_data_dict['clique_has'] + idx_offset
+
+        if virtual_node_idx not in htree_nx.nodes:
+            htree_nx.add_node(virtual_node_idx, x=node_data_dict['x'], pos=node_data_dict['pos'], \
+                label=node_data_dict['label'], node_type=node_data_dict['node_type']+'_virtual', \
+                    type='virtual', clique_has=node_data_dict['clique_has'])
+
+        htree_nx.add_edge(leaf_idx, virtual_node_idx)
+
+    # connect virtual nodes to clique nodes
+    for clique_idx in clique_nodes:
+        node_data_dict = htree_nx.nodes[clique_idx]
+        for node_idx in node_data_dict['clique_has']:
+            virtual_node_idx = node_idx + idx_offset
+            htree_nx.add_edge(virtual_node_idx, clique_idx)
+
+
+def nx_htree_to_torch(htree_nx, node_types=HTREE_NODE_TYPES+HTREE_VIRTUAL_NODE_TYPES, \
+    edge_types=HTREE_EDGE_TYPES+HTREE_POOL_EDGE_TYPES+HTREE_INIT_EDGE_TYPES, \
     clique_pos=torch.tensor([0, 0, 0], dtype=torch.float64), clique_label=-1):
     """
-    converts an networkx htree to heterogeneous torch data.
+    Converts an networkx htree to heterogeneous torch data.
     """
     # node attributes and node types
     x_ = []
@@ -312,6 +345,6 @@ def nx_htree_to_torch(htree_nx, node_types=HTREE_NODE_TYPES, edge_types=HTREE_ED
 
     # extracting the heterogeneous graph
     jth_torch = htree_homogeneous.to_heterogeneous(node_type=node_type_, edge_type=edge_type_,
-        node_type_names=HTREE_NODE_TYPES, edge_type_names=HTREE_EDGE_TYPES)
+        node_type_names=node_types, edge_type_names=edge_types)
 
     return jth_torch
