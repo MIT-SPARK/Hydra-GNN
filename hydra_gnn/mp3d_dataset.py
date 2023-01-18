@@ -13,7 +13,10 @@ EDGE_TYPES = [('objects', 'objects_to_objects', 'objects'),
 
 
 class Hydra_mp3d_data:
-    def __init__(self, scene_id, trajectory_id, num_frames, file_path) -> None:
+    """
+    data class that takes in a hydra-mp3d trajectory, converts and stores torch data for training.
+    """
+    def __init__(self, scene_id, trajectory_id, num_frames, file_path):
         assert os.path.exists(file_path)
         self._scene_id = scene_id
         self._trajectory_id = trajectory_id
@@ -32,30 +35,38 @@ class Hydra_mp3d_data:
         self._room_label_dict = None
 
     def add_room_labels(self, mp3d_info, angle_deg=-90):
+        """add room labels using ground-truth mp3d house segmentation"""
         add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg)
 
     def add_object_edges(self, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
+        """add object connectivity to self._G_ro"""
         add_object_connectivity(self._G_ro, threshold_near=threshold_near,
             threshold_on=threshold_on, max_near=max_near)
 
     @staticmethod
     def fill_missing_edge_index(torch_data, edge_types, dtype=torch.int64):
+        """helper function to fill missing edge types in torch_data to ensure all training data have the same edge_types"""
         for source_type, edge_name, target_type in edge_types:
             if (source_type, edge_name, target_type) in torch_data.edge_index_dict.keys():
                 continue
+
+            # missing intra-type edges, fill this type with empty edge_index
             if source_type == target_type:
                 torch_data[source_type, edge_name, target_type].edge_index = \
                     torch.empty((2, 0), dtype=dtype)
+            # missing inter-type edges but can find edges in the other direction, fill with flipped edge_index
             elif (target_type, '_'.join(edge_name.split('_')[::-1]), source_type) in \
                 torch_data.edge_index_dict.keys():
                 torch_data[source_type, edge_name, target_type].edge_index = \
                     torch_data[target_type, '_'.join(edge_name.split('_')[::-1]), source_type].edge_index.flip([0])
+            # missing inter-type edges without edges in the other direction, fill with empty edge_index
             else:
                 torch_data[source_type, edge_name, target_type].edge_index = \
                     torch.empty((2, 0), dtype=dtype)
 
     def compute_torch_data(self, use_heterogeneous: bool, node_converter, object_synonyms=[],
-                           room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')] ):
+                           room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]):
+        """compute self._torch data by converting self._G_ro to torch data"""
         # convert room-object dsg to torch graph
         self._torch_data = self._G_ro.to_torch(use_heterogeneous=use_heterogeneous,
             node_converter=node_converter)
