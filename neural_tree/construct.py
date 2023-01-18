@@ -31,99 +31,17 @@ HTREE_POOL_EDGE_TYPES = [('object', 'o_to_ov', 'object_virtual'),
                          ('room', 'r_to_rv', 'room_virtual')]
 
 
-def nx_htree_to_torch(jth_nx):
-    """
-    takes an nx_dsg, and outputs
-    """
-
-    for _, data_dict in jth_nx.nodes.items():
-        if 'label' not in data_dict.keys():
-            data_dict['label'] = -1     # adding fake label to all clique nodes
-
-        if 'pos' not in data_dict.keys():
-            data_dict['pos'] = [0.0, 0.0, 0.0]    # adding fake pos to all clique nodes
-
-    # nodes
-    x_ = []
-    pos_ = []
-    label_ = []
-    node_type_ = []
-
-    for _, data_dict in jth_nx.nodes.items():
-        x_.append(torch.tensor(data_dict['x'], dtype=torch.float64))
-        pos_.append(torch.tensor(data_dict['pos'], dtype=torch.float64))
-        label_.append(data_dict['label'])
-
-        if data_dict['node_type'] == 'object':
-            node_type_idx = 0
-        elif data_dict['node_type'] == 'room':
-            node_type_idx = 1
-        elif data_dict['node_type'] == 'object-room':
-            node_type_idx = 2
-        elif data_dict['node_type'] == 'room-room':
-            node_type_idx = 3
-        else:
-            raise ValueError(data_dict['node_type'])
-
-        node_type_.append(node_type_idx)
-
-    x_ = torch.vstack(x_)
-    pos_ = torch.vstack(pos_)
-    label_ = torch.tensor(label_, dtype=torch.int64)
-    node_type_ = torch.tensor(node_type_)
-
-    # edges
-    edges = list(jth_nx.edges)
-    edge_index = torch.tensor(edges, dtype=torch.int64).t().contiguous()
-
-    edge_type_list = []
-    for (i, j) in edges:
-
-        ci = jth_nx.nodes[i]['node_type']
-        cj = jth_nx.nodes[j]['node_type']
-
-        if (ci == 'object' and cj == 'object-room') or (ci == 'object-room' and cj == 'object'):
-            edge_type_idx = 0
-        elif (ci == 'room' and cj == 'object-room') or (ci == 'object-room' and cj == 'room'):
-            edge_type_idx = 1
-        elif (ci == 'room' and cj == 'room-room') or (ci == 'room-room' and cj == 'room'):
-            edge_type_idx = 2
-        elif (ci == 'object-room' and cj == 'room-room') or (ci == 'room-room' and cj == 'object-room'):
-            edge_type_idx = 3
-        elif (ci == 'object-room' and cj == 'object-room'):
-            edge_type_idx = 4
-        elif (ci == 'room-room' and cj == 'room-room'):
-            edge_type_idx = 5
-        else:
-            raise ValueError(i, j)
-        edge_type_list.append(edge_type_idx)
-
-    edge_type_ = torch.tensor(edge_type_list)
-
-    # generate homogeneous graph
-    jth_homogeneous = Data(x=x_, edge_index=edge_index, label=label_, pos=pos_, \
-        node_type=node_type_, edge_type=edge_type_)
-
-    # extracting the heterogeneous graph
-    jth_torch = jth_homogeneous.to_heterogeneous(
-        node_type_names=HTREE_NODE_TYPES, edge_type_names=HTREE_EDGE_TYPES)
-
-    return jth_torch
-
-
 def torch_dsg_to_nx(dsg_torch):
     """
     converts heterogeneous dsg_nx to a networkx graph, with object and room nodes labeled with node_type
-
     """
-
-    # converting to networkx
+    # convert to networkx
     _g = dsg_torch.to_homogeneous()
     node_type = dsg_torch.node_types
 
     dsg_nx = to_networkx(_g, node_attrs=['x', 'pos', 'label', 'node_type']).to_undirected()
 
-    # changing node_type from 0/1 to object/room
+    # change node_type from 0/1 to object/room
     for (_, data) in dsg_nx.nodes.items():
         # -1: for removing 's' from 'objects' and 'rooms'
         data['node_type'] = node_type[data['node_type']][:-1]
@@ -133,7 +51,7 @@ def torch_dsg_to_nx(dsg_torch):
 
 def get_room_graph(dsg_nx):
     """
-    This function extracts room graph from a networkx dsg.
+    extracts room graph from a networkx dsg.
     """
     room_idx_list = [idx for idx in dsg_nx.nodes \
         if dsg_nx.nodes[idx]['node_type'] == 'room']
@@ -141,10 +59,9 @@ def get_room_graph(dsg_nx):
     return dsg_nx.subgraph(room_idx_list), room_idx_list
 
 
-
 def get_object_graph(dsg_nx, room_idx):
     """
-    This function extracts object graph from a networkx dsg for a given room index.
+    extracts object graph from a networkx dsg for a given room index.
     """
     object_idx_list = [idx for idx in dsg_nx.neighbors(room_idx) \
         if dsg_nx.nodes[idx]['node_type'] == 'object']
@@ -154,8 +71,7 @@ def get_object_graph(dsg_nx, room_idx):
 
 def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, room_node_data=None, verbose=False):
     """
-    This function generates jth and root_nodes, given either room graph or objects graph in dsg_nx format
-
+    generates jth and root_nodes, given either room graph or objects graph in dsg_nx format
     """
     # parameters
     treewidth_bound = 10
@@ -167,12 +83,12 @@ def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, r
     if component_type == "rooms":
         # extracting H-tree of the room graph
         _, jth, root_nodes = sample_and_generate_jth(dsg_nx_component,
-                                                       k=treewidth_bound,
-                                                       zero_feature=zero_feature,
-                                                       copy_node_attributes=['x', 'pos', 'label', 'node_type'],
-                                                       need_root_tree=True,
-                                                       remove_edges_every_layer=True,
-                                                       verbose=verbose)
+                                                     k=treewidth_bound,
+                                                     zero_feature=zero_feature,
+                                                     copy_node_attributes=['x', 'pos', 'label', 'node_type'],
+                                                     need_root_tree=True,
+                                                     remove_edges_every_layer=True,
+                                                     verbose=verbose)
 
         # if room graph has only one node, "sample_and_generate_jth" returns nothing for room_root_nodes
         if len(dsg_nx_component) == 1:
@@ -240,7 +156,6 @@ def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, r
 
 class HTree:
     def __init__(self, room_jth, room_root_nodes):
-
         self.jth = room_jth
         self.root_nodes = room_root_nodes
         self.num_nodes = self.jth.number_of_nodes()
@@ -267,8 +182,8 @@ class HTree:
 
         # disconnecting all edges between object_root_nodes in object_jth
         H = object_jth.subgraph(object_root_nodes)
-        for e_, data in H.edges.items():
-            object_jth.remove_edge(e_[0], e_[1])
+        for edge in H.edges:
+            object_jth.remove_edge(edge[0], edge[1])
 
         # for root node that contains room_idx
         for _root_node in self.root_nodes:
@@ -344,44 +259,59 @@ def generate_htree(dsg_torch, verbose=False):
 
     return htree_nx
 
-if __name__ == "__main__":
 
-    dset = MP3D(complete=True)
+def nx_htree_to_torch(htree_nx, node_types=HTREE_NODE_TYPES, edge_types=HTREE_EDGE_TYPES, \
+    clique_pos=torch.tensor([0, 0, 0], dtype=torch.float64), clique_label=-1):
+    """
+    converts an networkx htree to heterogeneous torch data.
+    """
+    # add edges in the other direction
+    htree_nx = htree_nx.to_directed()
 
-    for idx, data in enumerate(dset):
+    # node attributes and node types
+    x_ = []
+    pos_ = []
+    label_ = []
+    node_type_ = []
 
-        dsg_torch = data['dsg_torch']
+    for _, data_dict in htree_nx.nodes.items():
+        x_.append(torch.tensor(data_dict['x'], dtype=torch.float64))
+        node_type_.append(node_types.index(data_dict['node_type']))
 
-        if dsg_torch.num_edges < 1:
-
-            print("---" * 40)
-            print(f"DSG contains only {dsg_torch.num_nodes} node.")
-            print(f"We skip H-tree construction for MP3D scene: {idx}")
-            print("---" * 40)
-
+        if data_dict['type'] == 'clique':
+            # add fake label and pos to all clique nodes
+            pos_.append(clique_pos)
+            label_.append(clique_label)
         else:
+            pos_.append(torch.tensor(data_dict['pos'], dtype=torch.float64))
+            label_.append(data_dict['label'])
 
-            print("---" * 40)
-            print(f"H-tree constructed for MP3D Scene: {idx}.")
-            print(f"DSG contains {dsg_torch.num_nodes} nodes.")
+    x_ = torch.vstack(x_)
+    pos_ = torch.vstack(pos_)
+    label_ = torch.tensor(label_, dtype=torch.int64)
+    node_type_ = torch.tensor(node_type_, dtype=torch.int64)
 
-            # compute h-trees
-            htree_nx = generate_htree(dsg_torch, verbose=False)
-            htree_torch = nx_htree_to_torch(htree_nx)
+    # edge types
+    edges = list(htree_nx.edges)
+    edge_index = torch.tensor(edges, dtype=torch.int64).t().contiguous()
 
-            # dsg_jth_list = generate_htree(dsg_torch, verbose=False)
-            # print(f"DSG is divided into {len(dsg_jth_list)} disconnected components.")
-            # for c in range(len(dsg_jth_list)):
-            #     print(f"Component {c}: H-tree contains {dsg_jth_list[c].jth.number_of_nodes()} nodes "
-            #           f"and {dsg_jth_list[c].jth.number_of_edges()} edges.")
+    edge_type_ = []
+    for (i, j) in edges:
+        node_type_i = htree_nx.nodes[i]['node_type']
+        node_type_j = htree_nx.nodes[j]['node_type']
 
-            #     if dsg_jth_list[c].jth.number_of_edges() < 1:
-            #         print("We skip H-tree conversion to torch_geometric. H-tree has no edges.")
-            #     else:
-            #         # convert to torch_geometric.data.HeteroData
-            #         dsg_jth_torch = jth_to_torch(dsg_jth_list[c].jth)
-            #         print(f"Component {c}: H-tree converted to torch_geometric.data.HeteroData")
+        edge_type_idx = next(idx for idx, edge_type in enumerate(edge_types) \
+            if (edge_type[0] == node_type_i and edge_type[2] == node_type_j))
+        edge_type_.append(edge_type_idx)
 
-            print("---" * 40)
+    edge_type_ = torch.tensor(edge_type_)
 
+    # generate homogeneous graph
+    htree_homogeneous = Data(x=x_, edge_index=edge_index, label=label_, pos=pos_, \
+        node_type=node_type_, edge_type=edge_type_)
 
+    # extracting the heterogeneous graph
+    jth_torch = htree_homogeneous.to_heterogeneous(node_type=node_type_, edge_type=edge_type_,
+        node_type_names=HTREE_NODE_TYPES, edge_type_names=HTREE_EDGE_TYPES)
+
+    return jth_torch
