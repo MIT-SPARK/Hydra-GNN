@@ -101,7 +101,8 @@ def nx_htree_to_torch(jth_nx):
     edge_type_ = torch.tensor(edge_type_list)
 
     # generate homogeneous graph
-    jth_homogeneous = Data(x=x_, edge_index=edge_index, y=label_, pos=pos_, node_type=node_type_, edge_type=edge_type_)
+    jth_homogeneous = Data(x=x_, edge_index=edge_index, label=label_, pos=pos_, \
+        node_type=node_type_, edge_type=edge_type_)
 
     # extracting the heterogeneous graph
     jth_torch = jth_homogeneous.to_heterogeneous(

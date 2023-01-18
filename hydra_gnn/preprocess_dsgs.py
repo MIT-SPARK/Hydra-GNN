@@ -174,6 +174,9 @@ def _dist(G, n1, n2):
 
 
 def add_object_connectivity(G, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
+    """
+    Add object connectivity between objects in the same room given an room-object dsg.
+    """
     room_to_objects = dict()
     for node in G.get_layer(dsg.DsgLayers.OBJECTS).nodes:
         room_id = node.get_parent()
@@ -266,7 +269,9 @@ def get_room_object_dsg(G, verbose=False):
 
 
 def _get_label_dict(labels, synonyms=None):
-    """Get mapping from (Hydra) labels to integer label index while grouping synonym labels. """
+    """
+    Get mapping from (Hydra) labels to integer label index while grouping synonym labels. 
+    """
     
     if synonyms is None or len(synonyms) == 0:
         return dict(zip(labels, range(len(labels))))
@@ -290,7 +295,7 @@ def _get_label_dict(labels, synonyms=None):
 def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM_LABELS,
                        object_synonyms=[], room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]):
     """
-    Convert labels
+    Convert (Hydra) room and object labels to training label y, and return hydra label to training label mappings.
     """
 
     # converting object labels from mp3d integer label to filtered integer label
@@ -329,11 +334,19 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
 
 
 def hydra_object_feature_converter(hydra_colormap_data, word2vec_model):
+    """
+    Returns a function that takes in hydra object label and returns word2vec semantic embedding vector.
+    """
     return lambda i: np.mean(
         [word2vec_model[s] for s in hydra_colormap_data['name'][i].split("_") if s != "of"], axis=0,)
 
 
-def hydra_node_converter(object_feature_converter, room_feature_converter=lambda i:np.empty(0)):
+def hydra_node_converter(object_feature_converter, room_feature_converter=lambda i:np.zeros(300)):
+    """
+    Returns a function that computes the node feature vector x for Hydra dsg to torch data conversion.
+    Here x is consists of 3d position, 3d (axis-aligned) bounding box size, 
+    and semantic feature computed by input feature converter function.
+    """
     def node_converter(G, x):
         if x.layer == 2:    # object
             return np.hstack((x.attributes.position, 
