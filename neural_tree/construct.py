@@ -69,14 +69,15 @@ def get_object_graph(dsg_nx, room_idx):
     return dsg_nx.subgraph(object_idx_list), object_idx_list
 
 
-def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, room_node_data=None, verbose=False):
+def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, room_node_data=None, \
+    treewidth_bound=10, verbose=False):
     """
     generates jth and root_nodes, given either room graph or objects graph in dsg_nx format
     """
     # parameters
-    treewidth_bound = 10
+    
     zero_feature = [0.0] * num_zero_padding
-    pos_zeros = [0.0] * 3
+    zero_pos = [0.0] * 3
 
     assert component_type in ["rooms", "objects"]
 
@@ -119,7 +120,7 @@ def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, r
 
         # if object graph has only one node, "sample_and_generate_jth" returns nothing for room_root_nodes
         if len(dsg_nx_component) == 1:
-            jth.add_node(1, x=zero_feature, pos=pos_zeros, type='clique', clique_has=[jth.nodes[0]['clique_has']])
+            jth.add_node(1, x=zero_feature, pos=zero_pos, type='clique', clique_has=[jth.nodes[0]['clique_has']])
             jth.add_edge(0, 1)
             root_nodes = [1]
 
@@ -160,13 +161,9 @@ class HTree:
         self.num_nodes = self.jth.number_of_nodes()
 
     def _reindex_and_compose(self, g, _root_nodes):
-
         # relabeling object_jth
-        new_labels = dict()
-        _idx = self.num_nodes
-        for i in range(g.number_of_nodes()):
-            new_labels[i] = _idx
-            _idx += 1
+        new_labels = dict(zip(range(g.number_of_nodes()), \
+            range(self.num_nodes, self.num_nodes + g.number_of_nodes())))
 
         g = nx.relabel_nodes(g, new_labels)
         _roots = [new_labels[i] for i in _root_nodes]
@@ -217,14 +214,13 @@ def generate_htree(dsg_torch, verbose=False):
         dsg_component_room, room_idx = get_room_graph(dsg_component)
 
         # extracting H-tree of the room graph
-        dsg_component_room_jth, _room_root_nodes = \
+        dsg_component_room_jth, room_root_nodes = \
             generate_component_jth(dsg_nx_component=dsg_component_room,
                                    component_type="rooms",
                                    num_zero_padding=dsg_torch['rooms'].num_features,
                                    verbose=verbose)
-
         # create a Htree
-        _htree = HTree(room_jth=dsg_component_room_jth, room_root_nodes=_room_root_nodes)
+        _htree = HTree(room_jth=dsg_component_room_jth, room_root_nodes=room_root_nodes)
 
         # extracting jth of the object graphs in a room
         for r in room_idx:
@@ -238,7 +234,7 @@ def generate_htree(dsg_torch, verbose=False):
                 object_graph_component = dsg_nx.subgraph(oc).copy()
 
                 # extracting H-tree of the object graph component
-                object_component_jth, _object_root_nodes = \
+                object_component_jth, object_root_nodes = \
                       generate_component_jth(dsg_nx_component=object_graph_component,
                                              component_type="objects",
                                              room_node_data=(r, dsg_component.nodes[r]),
@@ -247,7 +243,7 @@ def generate_htree(dsg_torch, verbose=False):
 
                 # adding to _htree
                 _htree.add_object_jth(object_jth=object_component_jth,
-                                      object_root_nodes=_object_root_nodes,
+                                      object_root_nodes=object_root_nodes,
                                       room_idx=r)
                 
         # add edges in the other direction
