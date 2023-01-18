@@ -152,6 +152,9 @@ def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, r
 
 
 class HTree:
+    """
+    Helper class to merge room tree and room-object trees.
+    """
     def __init__(self, room_jth, room_root_nodes):
         self.jth = room_jth
         self.root_nodes = room_root_nodes
@@ -255,7 +258,7 @@ def generate_htree(dsg_torch, verbose=False):
         # add htree component
         htree_nx = nx.disjoint_union(htree_nx, _htree.jth)
 
-    return htree_nx.to_directed()
+    return htree_nx
 
 
 def add_virtual_node_to_htree(htree_nx):
@@ -266,33 +269,38 @@ def add_virtual_node_to_htree(htree_nx):
     """
     assert 'virtual' not in [data_dict['type'] for data_dict in htree_nx.nodes.values()], \
         "Virtual node already in input graph."
+    
+    # convert input graph to a directed graph, since virtual edges are directed
+    htree_output = htree_nx.to_directed()
 
     # get leaf and clique nodes indices in the origianl input htree data
-    leaf_nodes = [idx for idx, data_dict in htree_nx.nodes.items() if data_dict['type'] == 'node']
-    clique_nodes = [idx for idx, data_dict in htree_nx.nodes.items() if data_dict['type'] == 'clique']
+    leaf_nodes = [idx for idx, data_dict in htree_output.nodes.items() if data_dict['type'] == 'node']
+    clique_nodes = [idx for idx, data_dict in htree_output.nodes.items() if data_dict['type'] == 'clique']
 
-    idx_offset = htree_nx.number_of_nodes() # index offset for virtual nodes
-    assert all((idx in range(idx_offset) for idx in htree_nx.nodes)), \
-        "Input graph must have nodes labeled using consecutive integers, try nxconvert_node_labels_to_integers."
+    idx_offset = htree_output.number_of_nodes() # index offset for virtual nodes
+    assert all((idx in range(idx_offset) for idx in htree_output.nodes)), \
+        "Input graph must have nodes labeled using consecutive integers, try nx.convert_node_labels_to_integers."
 
     # add virtual nodes and connect leaf nodes to virtual nodes
     for leaf_idx in leaf_nodes:
-        node_data_dict = htree_nx.nodes[leaf_idx]
+        node_data_dict = htree_output.nodes[leaf_idx]
         virtual_node_idx = node_data_dict['clique_has'] + idx_offset
 
-        if virtual_node_idx not in htree_nx.nodes:
-            htree_nx.add_node(virtual_node_idx, x=node_data_dict['x'], pos=node_data_dict['pos'], \
+        if virtual_node_idx not in htree_output.nodes:
+            htree_output.add_node(virtual_node_idx, x=node_data_dict['x'], pos=node_data_dict['pos'], \
                 label=node_data_dict['label'], node_type=node_data_dict['node_type']+'_virtual', \
                     type='virtual', clique_has=node_data_dict['clique_has'])
 
-        htree_nx.add_edge(leaf_idx, virtual_node_idx)
+        htree_output.add_edge(leaf_idx, virtual_node_idx)
 
     # connect virtual nodes to clique nodes
     for clique_idx in clique_nodes:
-        node_data_dict = htree_nx.nodes[clique_idx]
+        node_data_dict = htree_output.nodes[clique_idx]
         for node_idx in node_data_dict['clique_has']:
             virtual_node_idx = node_idx + idx_offset
-            htree_nx.add_edge(virtual_node_idx, clique_idx)
+            htree_output.add_edge(virtual_node_idx, clique_idx)
+    
+    return htree_output
 
 
 def nx_htree_to_torch(htree_nx, node_types=HTREE_NODE_TYPES+HTREE_VIRTUAL_NODE_TYPES, \
