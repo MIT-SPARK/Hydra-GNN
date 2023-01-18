@@ -246,8 +246,11 @@ def generate_htree(dsg_torch, verbose=False):
                                       object_root_nodes=object_root_nodes,
                                       room_idx=r)
                 
-        # add edges in the other direction
-        _htree.jth = _htree.jth.to_directed()
+        # if there is only one room node in this connected component, change room node clique_has attribute to int
+        if len(room_idx) == 1:
+            assert _htree.jth.nodes[0]['type'] == 'node'
+            assert len(_htree.jth.nodes[0]['clique_has']) == 1
+            _htree.jth.nodes[0]['clique_has'] = _htree.jth.nodes[0]['clique_has'][0]
 
         if verbose:
             print(f"Component {i}: H-tree contains {_htree.jth.number_of_nodes()} nodes "
@@ -256,7 +259,8 @@ def generate_htree(dsg_torch, verbose=False):
         # add htree component
         htree_nx = nx.disjoint_union(htree_nx, _htree.jth)
 
-    return htree_nx
+    return htree_nx.to_directed()
+
 
 
 def nx_htree_to_torch(htree_nx, node_types=HTREE_NODE_TYPES, edge_types=HTREE_EDGE_TYPES, \
