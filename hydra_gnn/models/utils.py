@@ -3,17 +3,15 @@ import torch_geometric.nn as pyg_nn
 from torch_geometric.nn import HeteroConv
 
 
-def build_conv_layer(conv_block, input_dim, hidden_dim):
+def build_conv_layer(conv_block, input_dim, output_dim):
     """
     Build a PyTorch Geometric convolution layer given specified input and output dimension.
     """
-    if conv_block == 'GCN':
-        return pyg_nn.GCNConv(input_dim, hidden_dim)
+    if conv_block == 'GraphSAGE':
+        return pyg_nn.SAGEConv(input_dim, output_dim, normalize=False, bias=True)
     elif conv_block == 'GIN':
-        return pyg_nn.GINConv(nn.Sequential(nn.Linear(input_dim, hidden_dim), nn.ReLU(),
-                                            nn.Linear(hidden_dim, hidden_dim)), eps=0., train_eps=True)
-    elif conv_block == 'GraphSAGE':
-        return pyg_nn.SAGEConv(input_dim, hidden_dim, normalize=False, bias=True)
+        return pyg_nn.GINConv(nn.Sequential(nn.Linear(input_dim, output_dim), nn.ReLU(),
+                                            nn.Linear(output_dim, output_dim)), eps=0., train_eps=True)
     else:
         return NotImplemented
 
