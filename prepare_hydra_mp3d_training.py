@@ -37,10 +37,7 @@ if __name__ == "__main__":
     colormap_data = pd.read_csv(COLORMAP_DATA_PATH, delimiter=',')
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(WORD2VEC_MODEL_PATH, binary=True)
     object_feature_converter=hydra_object_feature_converter(colormap_data, word2vec_model)
-    if args.use_hetero:
-        room_feature_converter = lambda i: np.zeros(300)
-    else:
-        room_feature_converter = lambda i: np.zeros(300)
+    room_feature_converter = lambda i: np.zeros(300)
 
     trajectory_dirs = os.listdir(HYDRA_TRAJ_DIR)
     skipped_json_files = {'none': [], 'no room': [], 'no object': []}
