@@ -2,11 +2,10 @@ from hydra_gnn.models.utils import build_hetero_conv, build_GAT_hetero_conv
 from hydra_gnn.mp3d_dataset import EDGE_TYPES
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn.norm.batch_norm import BatchNorm
 
 
 class HeterogeneousNetwork(nn.Module):
-    def __init__(self, input_dim, output_dim, conv_block='GCN', hidden_dim=None, num_layers=None,
+    def __init__(self, input_dim, output_dim, conv_block='GraphSAGE', hidden_dim=None, num_layers=None,
                  GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
         """
         This HeterogeneousNetwork class implements message passing on heterogenoues room-object graphs.
@@ -20,6 +19,7 @@ class HeterogeneousNetwork(nn.Module):
         :param dropout: float, dropout ratio during training
         """
         super(HeterogeneousNetwork, self).__init__()
+        assert conv_block in ['GraphSAGE', 'GAT']
         self.conv_block = conv_block
         self.num_layers = num_layers if conv_block != 'GAT' else len(GAT_heads)
         self.dropout = dropout
