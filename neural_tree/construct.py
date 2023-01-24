@@ -319,7 +319,8 @@ def nx_htree_to_torch(htree_nx, node_type_names=HTREE_NODE_TYPES+HTREE_VIRTUAL_N
     node_type_ = []
     clique_has_ = []
 
-    for _, data_dict in htree_nx.nodes.items():
+    for i in range(htree_nx.number_of_nodes()):
+        data_dict = htree_nx.nodes[i]
         x_.append(torch.tensor(data_dict['x'], dtype=torch.float64))
         node_type_.append(node_type_names.index(data_dict['node_type']))
 
