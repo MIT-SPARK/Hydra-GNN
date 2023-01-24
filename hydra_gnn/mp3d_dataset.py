@@ -1,6 +1,7 @@
 import spark_dsg as dsg
 from spark_dsg.mp3d import add_gt_room_label
 from hydra_gnn.preprocess_dsgs import get_room_object_dsg, convert_label_to_y, add_object_connectivity
+from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch
 import os.path
 import torch.utils
 from torch_geometric.data import HeteroData
@@ -129,6 +130,47 @@ class Hydra_mp3d_data:
     def clear_dsg(self):
         self._G = None
         self._G_ro = None
+
+
+class Hydra_mp3d_htree_data(Hydra_mp3d_data):
+    def __init__(self, scene_id, trajectory_id, num_frames, file_path):
+        super(Hydra_mp3d_htree_data, self).__init__(
+            scene_id, trajectory_id, num_frames, file_path)
+
+    def compute_torch_data(self, use_heterogeneous: bool, node_converter, object_synonyms=[], \
+        room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]):
+        """compute self._torch data by converting self._G_ro to htree in torch data format"""
+        if not use_heterogeneous:
+            raise NotImplemented
+
+        # convert room-object dsg to torch dsg using parent class method
+        Hydra_mp3d_data.compute_torch_data(self, use_heterogeneous=True, node_converter=node_converter, \
+            object_synonyms=object_synonyms, room_synonyms=room_synonyms)
+        
+        # generate heterogeneous networkx htree and add virtual nodes (for training)
+        htree_nx = generate_htree(self._torch_data, verbose=False)
+        htree_aug_nx = add_virtual_nodes_to_htree(htree_nx)
+
+        # update self._torch_data by coverting networkx htree to torch data
+        self._torch_data = nx_htree_to_torch(htree_aug_nx)
+
+        # convert hydra semantic label to torch training label
+        object_y = [self._object_label_dict[l] for l in self._torch_data['object_virtual'].label.tolist()]
+        room_y = [self._room_label_dict[chr(l)] for l in self._torch_data['room_virtual'].label.tolist()]
+
+        self._torch_data['object_virtual'].y = torch.tensor(object_y)
+        self._torch_data['room_virtual'].y = torch.tensor(room_y)
+
+    def to_homogeneous(self):
+        raise NotImplemented
+    
+    def num_node_features(self):
+        if self._torch_data is None:
+            return None
+        elif self.is_heterogeneous():
+            return (self._torch_data['room'].num_node_features, self._torch_data['object'].num_node_features)
+        else:
+            raise NotImplemented
 
 
 class Hydra_mp3d_dataset(torch.utils.data.Dataset):

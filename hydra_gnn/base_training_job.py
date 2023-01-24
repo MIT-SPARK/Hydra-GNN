@@ -10,8 +10,7 @@ from tensorboardX import SummaryWriter
 
 class BaseTrainingJob:
     def __init__(self, network_type, dataset_dict, network_params=None):
-        assert (network_type == 'homogeneous' or network_type == 'heterogeneous' \
-            or network_type == 'neural_tree')
+        assert network_type in ['homogeneous', 'heterogeneous', 'neural_tree']
         self._network_type = network_type
         self._dataset_dict = dataset_dict
 
@@ -36,7 +35,7 @@ class BaseTrainingJob:
                           'hidden_dim': 32,
                           'num_layers': 3,
                           'dropout': 0.25,
-                          'conv_block': 'GCN',
+                          'conv_block': 'GraphSAGE',
                           'GAT_hidden_dims': 16,
                           'GAT_heads': [4, 4],
                           'GAT_concats': [True, False],
@@ -125,13 +124,11 @@ class BaseTrainingJob:
                 pred_vec = self._net(batch.to(device))
                 if self._network_type == 'homogeneous':
                     label = batch.y[batch.room_mask]
-                    mask = (label != self._training_params['network_params']['ignored_label'])
                 elif self._network_type == 'heterogeneous':
                     label = batch['rooms'].y
-                    mask = (label != self._training_params['network_params']['ignored_label'])
                 else:
-                    mask = None
-                    raise NotImplemented
+                    label = batch['room_virtual'].y
+                mask = (label != self._training_params['network_params']['ignored_label'])
                 loss = self._net.loss(pred_vec, label, mask)
                 loss.backward()
                 opt.step()
@@ -200,15 +197,12 @@ class BaseTrainingJob:
                 pred = self._net(batch.to(device)).argmax(dim=1)
                 if self._network_type == 'homogeneous':
                     label = batch.y[batch.room_mask]
-                    mask = (label != self._training_params['network_params']['ignored_label'])
                 elif self._network_type == 'heterogeneous':
                     label = batch['rooms'].y
-                    mask = (label != self._training_params['network_params']['ignored_label'])
                 else:
-                    mask = None
-                    raise NotImplemented
+                    label = batch['room_virtual'].y
+                mask = (label != self._training_params['network_params']['ignored_label'])
 
-            if mask is not None:
                 pred = pred[mask]
                 label = label[mask]
 
