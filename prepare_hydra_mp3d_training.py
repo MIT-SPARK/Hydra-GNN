@@ -1,5 +1,5 @@
 from hydra_gnn.utils import PROJECT_DIR, HYDRA_TRAJ_DIR, MP3D_HOUSE_DIR, COLORMAP_DATA_PATH, WORD2VEC_MODEL_PATH
-from hydra_gnn.mp3d_dataset import Hydra_mp3d_data
+from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data
 from hydra_gnn.preprocess_dsgs import hydra_object_feature_converter, hydra_node_converter
 from spark_dsg.mp3d import load_mp3d_info
 import spark_dsg as dsg
@@ -26,13 +26,16 @@ if __name__ == "__main__":
                         help="output file name")
     parser.add_argument('--output_dir', default=os.path.join(PROJECT_DIR, 'output/preprocessed_mp3d'),
                         help="training and validation ratio")
-    parser.add_argument('--use_hetero', action='store_true', 
-                        help="Store torch graph as HeteroData")
+    parser.add_argument('--save_htree', action='store_true', 
+                        help="store htree data")
+    parser.add_argument('--save_homogeneous', action='store_true', 
+                        help="store torch data as HeteroData")
     args = parser.parse_args()
-    print("Saving torch graphs as Hetero data:", args.use_hetero)
+    print("Saving torch graphs as htree:", args.save_htree)
+    print("Saving torch graphs as homogeneous torch data:", args.save_homogeneous)
     print("Output directory:", args.output_dir)
-    print("Output data files:", args.output_filename, 'params.yaml', 'skipped_partial_scenes.yaml')
-    data_list = []
+    print("Output data files:", args.output_filename, ', params.yaml', ', skipped_partial_scenes.yaml')
+    input("Press any key to proceed...")
 
     colormap_data = pd.read_csv(COLORMAP_DATA_PATH, delimiter=',')
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(WORD2VEC_MODEL_PATH, binary=True)
@@ -41,7 +44,8 @@ if __name__ == "__main__":
 
     trajectory_dirs = os.listdir(HYDRA_TRAJ_DIR)
     skipped_json_files = {'none': [], 'no room': [], 'no object': []}
-    for trajectory_name in trajectory_dirs:
+    data_list = []
+    for i, trajectory_name in enumerate(trajectory_dirs):
         trajectory_dir = os.path.join(HYDRA_TRAJ_DIR, trajectory_name)
         scene_id, _, trajectory_id = trajectory_name.split('_')
         # Load gt house segmentation for room labeling
@@ -54,22 +58,24 @@ if __name__ == "__main__":
                 continue
             num_frames = json_file_name[15:-5]
             file_path = os.path.join(HYDRA_TRAJ_DIR, trajectory_name, json_file_name)
+            assert os.path.exists(file_path)
+
+            if args.save_htree:
+                data = Hydra_mp3d_htree_data(scene_id=scene_id, trajectory_id=trajectory_id, \
+                    num_frames=num_frames, file_path=file_path)
+            else:
             data = Hydra_mp3d_data(scene_id=scene_id, trajectory_id=trajectory_id, \
                 num_frames=num_frames, file_path=file_path)
-            assert os.path.exists(file_path)
 
             # skip dsg without room node or without object node
             if data.get_room_object_dsg().num_nodes() == 0:
                 skipped_json_files['none'].append(os.path.join(trajectory_name, json_file_name))
-                print('none', os.path.join(trajectory_name, json_file_name))
                 continue
             if data.get_room_object_dsg().get_layer(dsg.DsgLayers.ROOMS).num_nodes() == 0:
                 skipped_json_files['no room'].append(os.path.join(trajectory_name, json_file_name))
-                print('no room', os.path.join(trajectory_name, json_file_name))
                 continue
             if data.get_room_object_dsg().get_layer(dsg.DsgLayers.OBJECTS).num_nodes() == 0:
                 skipped_json_files['no object'].append(os.path.join(trajectory_name, json_file_name))
-                print('no object', os.path.join(trajectory_name, json_file_name))
                 continue
 
             # parepare torch data
@@ -77,12 +83,13 @@ if __name__ == "__main__":
             data.add_object_edges(
                 threshold_near=threshold_near, threshold_on=threshold_on, max_near=max_near)
             data.compute_torch_data(
-                use_heterogeneous=args.use_hetero,
+                use_heterogeneous=(not args.save_homogeneous),
                 node_converter=hydra_node_converter(object_feature_converter, room_feature_converter),
                 object_synonyms=object_synonyms, 
                 room_synonyms=room_synonyms)
             data.clear_dsg()    # remove hydra dsg for output
             data_list.append(data)
+        print(f"Done converting {i + 1}/{len(trajectory_dirs)} trajectories.")
     
     output_filename = args.output_filename
     with open(os.path.join(args.output_dir, output_filename), 'wb') as output_file:
