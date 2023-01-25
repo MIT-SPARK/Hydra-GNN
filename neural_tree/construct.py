@@ -1,4 +1,5 @@
 import networkx as nx
+import numpy as np
 import torch
 from torch_geometric.data import Data
 from torch_geometric.utils import to_networkx
@@ -304,10 +305,10 @@ def add_virtual_nodes_to_htree(htree_nx):
 
 
 def nx_htree_to_torch(htree_nx, node_type_names=HTREE_NODE_TYPES+HTREE_VIRTUAL_NODE_TYPES, \
-    edge_type_names=HTREE_EDGE_TYPES+HTREE_POOL_EDGE_TYPES+HTREE_INIT_EDGE_TYPES, \
-    clique_pos=torch.tensor([0, 0, 0], dtype=torch.float64), clique_label=-1):
+    edge_type_names=HTREE_EDGE_TYPES+HTREE_POOL_EDGE_TYPES+HTREE_INIT_EDGE_TYPES):
     """
-    Converts an networkx htree to heterogeneous torch data.
+    Converts an networkx htree to heterogeneous torch data. 
+    Clique nodes will have 'label' and 'clique_has' attributes set to -1.
     """
     if not all((idx in range(htree_nx.number_of_nodes()) for idx in htree_nx.nodes)):
         raise Warning("Relabeling the input graph nodes using consecutive integers.")
@@ -325,9 +326,11 @@ def nx_htree_to_torch(htree_nx, node_type_names=HTREE_NODE_TYPES+HTREE_VIRTUAL_N
         node_type_.append(node_type_names.index(data_dict['node_type']))
 
         if data_dict['type'] == 'clique':
-            # add fake label and pos to all clique nodes
-            pos_.append(clique_pos)
-            label_.append(clique_label)
+            # clique node position is the average position of neighboring room nodes
+            room_predecessor_pos = [htree_nx.nodes[idx]['pos'] for idx in htree_nx.predecessors(i) \
+                if htree_nx.nodes[idx]['node_type']=='room']
+            pos_.append(torch.tensor(np.mean(room_predecessor_pos, axis=0), dtype=torch.float64))
+            label_.append(-1)
             clique_has_.append(-1)
         else:
             pos_.append(torch.tensor(data_dict['pos'], dtype=torch.float64))
