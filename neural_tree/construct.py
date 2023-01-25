@@ -12,16 +12,16 @@ from neural_tree.h_tree.generate_junction_tree_hierarchies import sample_and_gen
 
 # h-tree data structure
 HTREE_NODE_TYPES = ['object', 'room', 'object-room', 'room-room']
-HTREE_EDGE_TYPES = [('object', 'o-to-or', 'object-room'),
-                    ('object-room', 'or-to-o', 'object'),
-                    ('room', 'r-to-or', 'object-room'),
-                    ('object-room', 'or-to-r', 'room'),
-                    ('room', 'r-to-rr', 'room-room'),
-                    ('room-room', 'rr-to-r', 'room'),
-                    ('object-room', 'or-ro-rr', 'room-room'),
-                    ('room-room', 'rr-ro-or', 'object-room'),
-                    ('object-room', 'or-to-or', 'object-room'),
-                    ('room-room', 'rr-to-rr', 'room-room')]
+HTREE_EDGE_TYPES = [('object', 'o_to_or', 'object-room'),
+                    ('object-room', 'or_to_o', 'object'),
+                    ('room', 'r_to_or', 'object-room'),
+                    ('object-room', 'or_to_r', 'room'),
+                    ('room', 'r_to_rr', 'room-room'),
+                    ('room-room', 'rr_to_r', 'room'),
+                    ('object-room', 'or_ro_rr', 'room-room'),
+                    ('room-room', 'rr_ro_or', 'object-room'),
+                    ('object-room', 'or_to_or', 'object-room'),
+                    ('room-room', 'rr_to_rr', 'room-room')]
 
 # auxilary virtual nodes and edges for pre and post learning feature extraction
 HTREE_VIRTUAL_NODE_TYPES = ['object_virtual', 'room_virtual']
@@ -305,14 +305,23 @@ def add_virtual_nodes_to_htree(htree_nx):
 
 
 def nx_htree_to_torch(htree_nx, node_type_names=HTREE_NODE_TYPES+HTREE_VIRTUAL_NODE_TYPES, \
-    edge_type_names=HTREE_EDGE_TYPES+HTREE_POOL_EDGE_TYPES+HTREE_INIT_EDGE_TYPES):
+    edge_type_names=HTREE_EDGE_TYPES+HTREE_POOL_EDGE_TYPES+HTREE_INIT_EDGE_TYPES,
+    double_precision: bool=False):
     """
     Converts an networkx htree to heterogeneous torch data. 
     Clique nodes will have 'label' and 'clique_has' attributes set to -1.
     """
     if not all((idx in range(htree_nx.number_of_nodes()) for idx in htree_nx.nodes)):
         raise Warning("Relabeling the input graph nodes using consecutive integers.")
-        
+
+    # output torch tensor data types
+    if double_precision:
+        dtype_int = torch.int64
+        dtype_float = torch.float64
+    else:
+        dtype_int = torch.int32
+        dtype_float = torch.float32
+    
     # node attributes and node types
     x_ = []
     pos_ = []
@@ -320,32 +329,37 @@ def nx_htree_to_torch(htree_nx, node_type_names=HTREE_NODE_TYPES+HTREE_VIRTUAL_N
     node_type_ = []
     clique_has_ = []
 
+    read_pos_from = 'room_virtual' if 'room_virtual' in node_type_names else 'room'
     for i in range(htree_nx.number_of_nodes()):
         data_dict = htree_nx.nodes[i]
-        x_.append(torch.tensor(data_dict['x'], dtype=torch.float64))
         node_type_.append(node_type_names.index(data_dict['node_type']))
 
         if data_dict['type'] == 'clique':
             # clique node position is the average position of neighboring room nodes
             room_predecessor_pos = [htree_nx.nodes[idx]['pos'] for idx in htree_nx.predecessors(i) \
-                if htree_nx.nodes[idx]['node_type']=='room']
-            pos_.append(torch.tensor(np.mean(room_predecessor_pos, axis=0), dtype=torch.float64))
+                if htree_nx.nodes[idx]['node_type']==read_pos_from]
+            if room_predecessor_pos:
+                pos_.append(torch.tensor(np.mean(room_predecessor_pos, axis=0), dtype=dtype_float))
+            else:   # will not get to this if read_pos_from == room_virtual
+                pos_.append(torch.zeros(3, dtype=dtype_float))
+            x_.append(torch.hstack((pos_[-1], torch.tensor(data_dict['x'][3:], dtype=dtype_float))))
             label_.append(-1)
             clique_has_.append(-1)
         else:
-            pos_.append(torch.tensor(data_dict['pos'], dtype=torch.float64))
+            x_.append(torch.tensor(data_dict['x'], dtype=dtype_float))
+            pos_.append(torch.tensor(data_dict['pos'], dtype=dtype_float))
             label_.append(data_dict['label'])
             clique_has_.append(data_dict['clique_has'])
 
     x_ = torch.vstack(x_)
     pos_ = torch.vstack(pos_)
-    label_ = torch.tensor(label_, dtype=torch.int64)
-    node_type_ = torch.tensor(node_type_, dtype=torch.int64)
-    clique_has_ = torch.tensor(clique_has_, dtype=torch.int64)
+    label_ = torch.tensor(label_, dtype=dtype_int)
+    node_type_ = torch.tensor(node_type_)
+    clique_has_ = torch.tensor(clique_has_, dtype=dtype_int)
 
     # edge types
     edges = list(htree_nx.edges)
-    edge_index = torch.tensor(edges, dtype=torch.int64).t().contiguous()
+    edge_index = torch.tensor(edges).t().contiguous()
 
     edge_type_ = []
     for (i, j) in edges:

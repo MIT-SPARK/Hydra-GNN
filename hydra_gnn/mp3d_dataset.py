@@ -45,7 +45,7 @@ class Hydra_mp3d_data:
             threshold_on=threshold_on, max_near=max_near)
 
     @staticmethod
-    def fill_missing_edge_index(torch_data, edge_types, dtype=torch.int64):
+    def fill_missing_edge_index(torch_data, edge_types):
         """helper function to fill missing edge types in torch_data to ensure all training data have the same edge_types"""
         for source_type, edge_name, target_type in edge_types:
             if (source_type, edge_name, target_type) in torch_data.edge_index_dict.keys():
@@ -54,7 +54,7 @@ class Hydra_mp3d_data:
             # missing intra-type edges, fill this type with empty edge_index
             if source_type == target_type:
                 torch_data[source_type, edge_name, target_type].edge_index = \
-                    torch.empty((2, 0), dtype=dtype)
+                    torch.empty((2, 0), dtype=torch.int64)
             # missing inter-type edges but can find edges in the other direction, fill with flipped edge_index
             elif (target_type, '_'.join(edge_name.split('_')[::-1]), source_type) in \
                 torch_data.edge_index_dict.keys():
@@ -63,14 +63,15 @@ class Hydra_mp3d_data:
             # missing inter-type edges without edges in the other direction, fill with empty edge_index
             else:
                 torch_data[source_type, edge_name, target_type].edge_index = \
-                    torch.empty((2, 0), dtype=dtype)
+                    torch.empty((2, 0), dtype=torch.int64)
 
     def compute_torch_data(self, use_heterogeneous: bool, node_converter, object_synonyms=[],
-                           room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]):
+                           room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')], 
+                           double_precision=False):
         """compute self._torch data by converting self._G_ro to torch data"""
         # convert room-object dsg to torch graph
         self._torch_data = self._G_ro.to_torch(use_heterogeneous=use_heterogeneous,
-            node_converter=node_converter)
+            node_converter=node_converter, double_precision=double_precision)
         
         if use_heterogeneous:   # for HeteroData, make sure all edges are there
             self.fill_missing_edge_index(self._torch_data, EDGE_TYPES)

@@ -9,7 +9,7 @@ from tensorboardX import SummaryWriter
 
 
 class BaseTrainingJob:
-    def __init__(self, network_type, dataset_dict, network_params=None):
+    def __init__(self, network_type, dataset_dict, network_params, double_precision=False):
         assert network_type in ['homogeneous', 'heterogeneous', 'neural_tree']
         self._network_type = network_type
         self._dataset_dict = dataset_dict
@@ -27,6 +27,8 @@ class BaseTrainingJob:
     
         # initialize network
         self._net = self.initialize_network()
+        if double_precision:
+            self._net.double()
 
     @staticmethod
     def create_default_params():
@@ -73,11 +75,11 @@ class BaseTrainingJob:
 
     def initialize_network(self):
         if self._network_type == 'homogeneous':
-            return HomogeneousNetwork(**self._training_params['network_params']).double()
+            return HomogeneousNetwork(**self._training_params['network_params'])
         elif self._network_type == 'heterogeneous':
-            return HeterogeneousNetwork(**self._training_params['network_params']).double()
+            return HeterogeneousNetwork(**self._training_params['network_params'])
         else:
-            return NeuralTreeNetwork(**self._training_params['network_params']).double()
+            return NeuralTreeNetwork(**self._training_params['network_params'])
 
     def get_dataset(self, split_name):
         return self._dataset_dict[split_name]
