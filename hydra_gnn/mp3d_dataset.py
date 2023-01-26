@@ -84,6 +84,21 @@ class Hydra_mp3d_data:
             convert_label_to_y(self._torch_data, object_synonyms=object_synonyms,
                 room_synonyms=room_synonyms)
     
+    def compute_relative_pos(self):
+        """remove first three elements (3d pos) in x for each node and fill edge feature with relative pos"""
+        if self._torch_data.edge_attr_dict:
+            raise Warning("Cannot compute relative pos as edge_attr -- edge_attr is not empty.")
+
+        # remove first three elements in x
+        for node_type in self._torch_data.x_dict:
+            self._torch_data[node_type].x = self._torch_data[node_type].x[:, 3:]
+
+        # fill edge feature with relative pos
+        for edge_type, edge_index in self._torch_data.edge_index_dict.items():
+            source, _, target = edge_type
+            self._torch_data[edge_type].edge_attr = \
+                self._torch_data[target].pos[edge_index[1]] - self._torch_data[source].pos[edge_index[0]]
+        
     def to_homogeneous(self):
         if isinstance(self._torch_data, HeteroData):
             self._torch_data = self._torch_data.to_homogeneous(add_edge_type=False)
@@ -93,9 +108,10 @@ class Hydra_mp3d_data:
         if self._torch_data is None:
             return None
         elif self.is_heterogeneous():
-            return (self._torch_data['rooms'].num_node_features, self._torch_data['objects'].num_node_features)
+            return {node_type: self._torch_data[node_type].num_node_features \
+                for node_type in self._torch_data.x_dict}
         else:
-            return (self._torch_data.num_node_features, self._torch_data.num_node_features)
+            return self._torch_data.num_node_features
     
     def num_room_labels(self):
         return max(self._room_label_dict.values()) + 1
@@ -139,21 +155,27 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
             scene_id, trajectory_id, num_frames, file_path)
 
     def compute_torch_data(self, use_heterogeneous: bool, node_converter, object_synonyms=[], \
-        room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]):
+        room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')], double_precision=False,
+        remove_clique_semantic_feature=True):
         """compute self._torch data by converting self._G_ro to htree in torch data format"""
         if not use_heterogeneous:
             raise NotImplemented
 
         # convert room-object dsg to torch dsg using parent class method
         Hydra_mp3d_data.compute_torch_data(self, use_heterogeneous=True, node_converter=node_converter, \
-            object_synonyms=object_synonyms, room_synonyms=room_synonyms)
+            object_synonyms=object_synonyms, room_synonyms=room_synonyms, double_precision=double_precision)
         
         # generate heterogeneous networkx htree and add virtual nodes (for training)
         htree_nx = generate_htree(self._torch_data, verbose=False)
         htree_aug_nx = add_virtual_nodes_to_htree(htree_nx)
 
         # update self._torch_data by coverting networkx htree to torch data
-        self._torch_data = nx_htree_to_torch(htree_aug_nx)
+        self._torch_data = nx_htree_to_torch(htree_aug_nx, double_precision=double_precision)
+
+        # remove redundant zero semantic features (assume it is a 300-dim and at then end of x)
+        if remove_clique_semantic_feature:
+            self._torch_data['object-room'].x = self._torch_data['object-room'].x[:, :-300]
+            self._torch_data['room-room'].x = self._torch_data['room-room'].x[:, :-300]
 
         # convert hydra semantic label to torch training label
         object_y = [self._object_label_dict[l] for l in self._torch_data['object_virtual'].label.tolist()]
@@ -164,14 +186,6 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
     def to_homogeneous(self):
         raise NotImplemented
-    
-    def num_node_features(self):
-        if self._torch_data is None:
-            return None
-        elif self.is_heterogeneous():
-            return (self._torch_data['room'].num_node_features, self._torch_data['object'].num_node_features)
-        else:
-            raise NotImplemented
 
 
 class Hydra_mp3d_dataset(torch.utils.data.Dataset):

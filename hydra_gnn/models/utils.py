@@ -3,7 +3,7 @@ import torch_geometric.nn as pyg_nn
 from torch_geometric.nn import HeteroConv
 
 
-def build_conv_layer(conv_block, input_dim, output_dim):
+def build_conv_layer(conv_block, input_dim, output_dim, **kwargs):
     """
     Build a PyTorch Geometric convolution layer given specified input and output dimension.
     """
@@ -12,11 +12,14 @@ def build_conv_layer(conv_block, input_dim, output_dim):
     elif conv_block == 'GIN':
         return pyg_nn.GINConv(nn.Sequential(nn.Linear(input_dim, output_dim), nn.ReLU(),
                                             nn.Linear(output_dim, output_dim)), eps=0., train_eps=True)
+    elif conv_block == 'PointTransformer':
+        return pyg_nn.PointTransformerConv(input_dim, output_dim, **kwargs)
     else:
         return NotImplemented
 
 
-def build_GAT_conv_layers(input_dim, hidden_dims, heads, concats, dropout=0., add_self_loop=True):
+def build_GAT_conv_layers(input_dim, hidden_dims, heads, concats, dropout=0., add_self_loop=True, \
+    edge_dim=None, fill_value='mean'):
     """
     Build a list of PyTorch Geometric GAT convolution layers given input dimension and dropout ratio. This function also
      requires hidden dimensions, number of attention heads, concatenation flags for all layers.
@@ -25,33 +28,43 @@ def build_GAT_conv_layers(input_dim, hidden_dims, heads, concats, dropout=0., ad
     assert len(hidden_dims) == len(concats)
     convs = nn.ModuleList()
     convs.append(pyg_nn.GATConv(input_dim, hidden_dims[0], heads=heads[0], concat=concats[0], 
-                                dropout=dropout, add_self_loops=add_self_loop))
+                                dropout=dropout, add_self_loops=add_self_loop, edge_dim=edge_dim, 
+                                fill_value=fill_value))
     for i in range(1, len(hidden_dims)):
         if concats[i - 1]:
             convs.append(pyg_nn.GATConv(hidden_dims[i - 1] * heads[i - 1], hidden_dims[i], heads=heads[i], 
-                                        concat=concats[i], dropout=dropout, add_self_loops=add_self_loop))
+                                        concat=concats[i], dropout=dropout, add_self_loops=add_self_loop,
+                                        edge_dim=edge_dim, fill_value=fill_value))
         else:
             convs.append(pyg_nn.GATConv(hidden_dims[i - 1], hidden_dims[i], heads=heads[i], 
-                                        concat=concats[i], dropout=dropout, add_self_loops=add_self_loop))
+                                        concat=concats[i], dropout=dropout, add_self_loops=add_self_loop,
+                                        edge_dim=edge_dim, fill_value=fill_value))
     return convs
 
 
 def build_hetero_conv(conv_block, edge_types, input_dim_dict, output_dim_dict, aggr='sum'):
     conv_dict = dict()
     for source, edge_name, target in edge_types:
-        conv_dict[source, edge_name, target] = \
-            build_conv_layer(conv_block, input_dim_dict[source], output_dim_dict[target])
+        if conv_block == 'PointTransformer':
+            conv_dict[source, edge_name, target] = \
+                build_conv_layer(conv_block, input_dim_dict[source], output_dim_dict[target], 
+                add_self_loops=(source==target))
+        else:
+            conv_dict[source, edge_name, target] = \
+                build_conv_layer(conv_block, input_dim_dict[source], output_dim_dict[target])
     return HeteroConv(conv_dict, aggr=aggr)
 
 
 def build_GAT_hetero_conv(edge_types, input_dim_dict, output_dim_dict, 
-                          GAT_hidden_dims, GAT_heads, GAT_concats, dropout, aggr='sum'):
+                          GAT_hidden_dims, GAT_heads, GAT_concats, dropout, aggr='sum',
+                          edge_dim=None, fill_value='mean'):
     # build GAT conv layers for each edge type
     conv_module_list_dict = dict()
     for source, edge_name, target in edge_types:
         conv_module_list_dict[source, edge_name, target] = build_GAT_conv_layers(
                 input_dim_dict[source], GAT_hidden_dims + [output_dim_dict[target]], 
-                GAT_heads, GAT_concats, dropout, add_self_loop=(source==target))
+                GAT_heads, GAT_concats, dropout, add_self_loop=(source==target), 
+                edge_dim=edge_dim, fill_value=fill_value)
     # assemble each layer using HeteroConv
     convs = nn.ModuleList()
     for i in range(len(GAT_heads)):

@@ -18,12 +18,20 @@ class BaseTrainingJob:
         self._training_params = self.create_default_params()
         self.update_training_params(network_params=network_params)
         
-        room_input_feature, object_input_feature = \
-            dataset_dict['train'].get_data(0).num_node_features()
-        assert room_input_feature == object_input_feature
-        input_dim = object_input_feature
-        self.update_training_params(network_params={'input_dim': input_dim,
-            'output_dim': dataset_dict['train'].get_data(0).num_room_labels()})
+        input_dim = dataset_dict['train'].get_data(0).num_node_features()
+        # sanity check
+        if network_type == 'heterogeneous':
+            assert input_dim['objects'] == input_dim['rooms']
+        elif network_type == 'neural_tree':
+            assert input_dim['object'] == input_dim['room']
+            assert input_dim['object-room'] == input_dim['room-room']
+        
+        if network_type == 'homogeneous':
+            self.update_training_params(network_params={'input_dim': input_dim,
+                'output_dim': dataset_dict['train'].get_data(0).num_room_labels()})
+        else:
+            self.update_training_params(network_params={'input_dim_dict': input_dim,
+                'output_dim': dataset_dict['train'].get_data(0).num_room_labels()})
     
         # initialize network
         self._net = self.initialize_network()
@@ -32,9 +40,7 @@ class BaseTrainingJob:
 
     @staticmethod
     def create_default_params():
-        network_params = {'input_dim': None,
-                          'output_dim': None,
-                          'hidden_dim': 32,
+        network_params = {'hidden_dim': 32,
                           'num_layers': 3,
                           'dropout': 0.25,
                           'conv_block': 'GraphSAGE',
@@ -52,8 +58,9 @@ class BaseTrainingJob:
         return training_params
 
     def clean_up_network_params(self):
-        if self._training_params['network_params']['conv_block'] == 'GAT':
+        if self._training_params['network_params']['conv_block'][:3] == 'GAT':
             delattr(self._training_params['network_params'],'num_layers' )
+            delattr(self._training_params['network_params'],'hidden_dim' )
         else:
             delattr(self._training_params['network_params'],'GAT_hidden_dims' )
             delattr(self._training_params['network_params'],'GAT_heads' )
