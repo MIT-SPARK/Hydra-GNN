@@ -19,12 +19,6 @@ class BaseTrainingJob:
         self.update_training_params(network_params=network_params)
         
         input_dim = dataset_dict['train'].get_data(0).num_node_features()
-        # sanity check
-        if network_type == 'heterogeneous':
-            assert input_dim['objects'] == input_dim['rooms']
-        elif network_type == 'neural_tree':
-            assert input_dim['object'] == input_dim['room']
-            assert input_dim['object-room'] == input_dim['room-room']
         
         if network_type == 'homogeneous':
             self.update_training_params(network_params={'input_dim': input_dim,
