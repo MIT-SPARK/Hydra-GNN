@@ -39,10 +39,10 @@ class Hydra_mp3d_data:
         """add room labels using ground-truth mp3d house segmentation"""
         add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg)
 
-    def add_object_edges(self, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
+    def add_object_edges(self, threshold_near=2.0, max_near=2.0, max_on=0.2):
         """add object connectivity to self._G_ro"""
-        add_object_connectivity(self._G_ro, threshold_near=threshold_near,
-            threshold_on=threshold_on, max_near=max_near)
+        add_object_connectivity(self._G_ro, threshold_near=threshold_near, max_near=max_near,
+            max_on=max_on)
 
     @staticmethod
     def fill_missing_edge_index(torch_data, edge_types):
