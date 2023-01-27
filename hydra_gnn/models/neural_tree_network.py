@@ -1,5 +1,5 @@
 from hydra_gnn.models.utils import build_hetero_conv, build_GAT_hetero_conv
-from neural_tree.construct import HTREE_NODE_TYPES, HTREE_VIRTUAL_NODE_TYPES, HTREE_EDGE_TYPES, HTREE_INIT_EDGE_TYPES
+from neural_tree.construct import HTREE_NODE_TYPES, HTREE_EDGE_TYPES, HTREE_INIT_EDGE_TYPES
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -50,23 +50,21 @@ class NeuralTreeNetwork(nn.Module):
         self.dropout = dropout
 
         # dimension dictionaries
-        assert input_dim_dict['object'] == input_dim_dict['room']
+        # assert input_dim_dict['object'] == input_dim_dict['room']
         assert input_dim_dict['object'] == input_dim_dict['object_virtual']
         assert input_dim_dict['room'] == input_dim_dict['room_virtual']
         assert input_dim_dict['object-room'] == input_dim_dict['room-room']
-        leaf_input_dim = input_dim_dict['object']
-        clique_input_dim = input_dim_dict['object-room']
 
         # initialize clique features - match output dimension with leaf dimension
         conv_dict = dict()
         for source, edge_name, target in HTREE_INIT_EDGE_TYPES:
             conv_dict[source, edge_name, target] = \
-                pyg_nn.GATConv((leaf_input_dim, clique_input_dim), leaf_input_dim, 
+                pyg_nn.GATConv((input_dim_dict[source], input_dim_dict[target]), input_dim_dict[target], 
                                heads=1, concat=False, dropout=0.0, add_self_loops=False)
         self.pre_mp = HeteroConv(conv_dict, aggr='mean')
 
         # message passing
-        mp_input_dim_dict = {node_type: leaf_input_dim for node_type in HTREE_NODE_TYPES}
+        mp_input_dim_dict = {node_type: input_dim_dict[node_type] for node_type in HTREE_NODE_TYPES}
         hidden_dim_dict = {node_type: hidden_dim for node_type in HTREE_NODE_TYPES}
         output_dim_dict = {node_type: output_dim for node_type in HTREE_NODE_TYPES}
         if self.conv_block == 'GAT':
@@ -94,7 +92,7 @@ class NeuralTreeNetwork(nn.Module):
         x_dict, edge_index_dict = data.x_dict, data.edge_index_dict
 
         # initialize clique nodes
-        x_dict = self.pre_mp(x_dict, edge_index_dict)
+        x_dict.update(self.pre_mp(x_dict, edge_index_dict))
 
         # x = F.dropout(x, p=self.dropout, training=self.training)
         for i in range(self.num_layers):

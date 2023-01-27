@@ -47,11 +47,12 @@ def build_hetero_conv(conv_block, edge_types, input_dim_dict, output_dim_dict, a
     for source, edge_name, target in edge_types:
         if conv_block == 'PointTransformer':
             conv_dict[source, edge_name, target] = \
-                build_conv_layer(conv_block, input_dim_dict[source], output_dim_dict[target], 
-                add_self_loops=(source==target))
+                build_conv_layer(conv_block, (input_dim_dict[source], input_dim_dict[target]),
+                                 output_dim_dict[target], add_self_loops=(source==target))
         else:
             conv_dict[source, edge_name, target] = \
-                build_conv_layer(conv_block, input_dim_dict[source], output_dim_dict[target])
+                build_conv_layer(conv_block, (input_dim_dict[source], input_dim_dict[target]), 
+                                 output_dim_dict[target])
     return HeteroConv(conv_dict, aggr=aggr)
 
 
@@ -61,8 +62,9 @@ def build_GAT_hetero_conv(edge_types, input_dim_dict, output_dim_dict,
     # build GAT conv layers for each edge type
     conv_module_list_dict = dict()
     for source, edge_name, target in edge_types:
-        conv_module_list_dict[source, edge_name, target] = build_GAT_conv_layers(
-                input_dim_dict[source], GAT_hidden_dims + [output_dim_dict[target]], 
+        conv_module_list_dict[source, edge_name, target] = \
+            build_GAT_conv_layers((input_dim_dict[source], input_dim_dict[target]), 
+                                  GAT_hidden_dims + [output_dim_dict[target]], 
                 GAT_heads, GAT_concats, dropout, add_self_loop=(source==target), 
                 edge_dim=edge_dim, fill_value=fill_value)
     # assemble each layer using HeteroConv

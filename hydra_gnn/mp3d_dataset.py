@@ -1,8 +1,7 @@
-import spark_dsg as dsg
-from spark_dsg.mp3d import add_gt_room_label
 from hydra_gnn.preprocess_dsgs import get_room_object_dsg, convert_label_to_y, add_object_connectivity
 from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch
 import os.path
+import importlib
 import torch.utils
 from torch_geometric.data import HeteroData
 
@@ -12,6 +11,13 @@ EDGE_TYPES = [('objects', 'objects_to_objects', 'objects'),
               ('objects', 'objects_to_rooms', 'rooms'),
               ('rooms', 'rooms_to_objects', 'objects')]
 
+
+def _get_spark_dsg():
+    try:
+        dsg = importlib.import_module('spark_dsg')
+    except ImportError:
+        raise ValueError("spark_dsg not found.")
+    return dsg
 
 class Hydra_mp3d_data:
     """
@@ -25,6 +31,7 @@ class Hydra_mp3d_data:
         self._file_path = file_path
         
         # extract complete dsg (for book-keeping) and room-object graph
+        dsg = _get_spark_dsg()
         self._G = dsg.DynamicSceneGraph.load(file_path)
         dsg.add_bounding_boxes_to_layer(self._G, dsg.DsgLayers.ROOMS)
         self._G_ro = get_room_object_dsg(self._G, verbose=False)
@@ -37,7 +44,8 @@ class Hydra_mp3d_data:
 
     def add_room_labels(self, mp3d_info, angle_deg=-90):
         """add room labels using ground-truth mp3d house segmentation"""
-        add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg)
+        dsg = _get_spark_dsg()
+        dsg.mp3d.add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg)
 
     def add_object_edges(self, threshold_near=2.0, max_near=2.0, max_on=0.2):
         """add object connectivity to self._G_ro"""
@@ -83,7 +91,7 @@ class Hydra_mp3d_data:
         self._object_label_dict, self._room_label_dict = \
             convert_label_to_y(self._torch_data, object_synonyms=object_synonyms,
                 room_synonyms=room_synonyms)
-    
+
     def compute_relative_pos(self):
         """remove first three elements (3d pos) in x for each node and fill edge feature with relative pos"""
         if self._torch_data.edge_attr_dict:
@@ -156,7 +164,7 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
     def compute_torch_data(self, use_heterogeneous: bool, node_converter, object_synonyms=[], \
         room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')], double_precision=False,
-        remove_clique_semantic_feature=True):
+        remove_room_semantic_feature=True, remove_clique_semantic_feature=True):
         """compute self._torch data by converting self._G_ro to htree in torch data format"""
         if not use_heterogeneous:
             raise NotImplemented
@@ -173,6 +181,9 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         self._torch_data = nx_htree_to_torch(htree_aug_nx, double_precision=double_precision)
 
         # remove redundant zero semantic features (assume it is a 300-dim and at then end of x)
+        if remove_room_semantic_feature:
+            self._torch_data['room'].x = self._torch_data['room'].x[:, :-300]
+            self._torch_data['room_virtual'].x = self._torch_data['room_virtual'].x[:, :-300]
         if remove_clique_semantic_feature:
             self._torch_data['object-room'].x = self._torch_data['object-room'].x[:, :-300]
             self._torch_data['room-room'].x = self._torch_data['room-room'].x[:, :-300]

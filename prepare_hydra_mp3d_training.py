@@ -40,12 +40,15 @@ if __name__ == "__main__":
     print("Output directory:", args.output_dir) 
     print("Output data files:", f"{args.output_filename}, {param_filename}, {skipped_filename}")
     if os.path.exists(os.path.join(args.output_dir, args.output_filename)):
-        input("Output file exists. Press any key to proceed...")
+        input("Output data file exists. Press any key to proceed...")
 
     colormap_data = pd.read_csv(COLORMAP_DATA_PATH, delimiter=',')
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(WORD2VEC_MODEL_PATH, binary=True)
     object_feature_converter=hydra_object_feature_converter(colormap_data, word2vec_model)
-    room_feature_converter = lambda i: np.zeros(300)
+    if args.save_htree or args.save_homogeneous:
+        room_feature_converter = lambda i: np.zeros(300)
+    else:
+        room_feature_converter = lambda i: np.zeros(0)
 
     trajectory_dirs = os.listdir(HYDRA_TRAJ_DIR)
     skipped_json_files = {'none': [], 'no room': [], 'no object': []}
@@ -93,6 +96,9 @@ if __name__ == "__main__":
                 room_synonyms=room_synonyms)
             data.clear_dsg()    # remove hydra dsg for output
             data_list.append(data)
+        
+        if i == 0:
+            print(f"Number of node features: {data.num_node_features()}")
         print(f"Done converting {i + 1}/{len(trajectory_dirs)} trajectories.")
 
     with open(os.path.join(args.output_dir, args.output_filename), 'wb') as output_file:
