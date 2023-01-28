@@ -1,4 +1,4 @@
-import warnings
+import importlib
 import numpy as np
 import torch
 from torch_geometric.data import (Data, HeteroData)
@@ -68,6 +68,14 @@ ROOM_LABELS = [
     'Z', # junk (reflections of mirrors, random points floating in space, etc.)
     '\x15', # Hydra-DSG unlabeled room
 ]
+
+
+def get_spark_dsg():
+    try:
+        dsg = importlib.import_module('spark_dsg')
+    except ImportError:
+        raise ValueError("spark_dsg not found.")
+    return dsg
 
 
 def _is_on(G, n1, n2, max_on):
