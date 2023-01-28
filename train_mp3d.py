@@ -127,8 +127,6 @@ if __name__ == "__main__":
 
             val_accuracy_list.append(best_acc[0] * 100)
             test_accuracy_list.append(best_acc[1] * 100)
-            val_accuracy_list.append(0 * 100)
-            test_accuracy_list.append(0 * 100)
 
         # save param and accuracy
         output_data_list = [f"experiment_{experiment_i}"] + [param_dict[key] for key in log_params] + \
