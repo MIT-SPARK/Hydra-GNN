@@ -1,7 +1,6 @@
-from hydra_gnn.preprocess_dsgs import get_room_object_dsg, convert_label_to_y, add_object_connectivity
+from hydra_gnn.preprocess_dsgs import get_spark_dsg, get_room_object_dsg, convert_label_to_y, add_object_connectivity
 from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch
 import os.path
-import importlib
 import torch.utils
 from torch_geometric.data import HeteroData
 
@@ -11,13 +10,6 @@ EDGE_TYPES = [('objects', 'objects_to_objects', 'objects'),
               ('objects', 'objects_to_rooms', 'rooms'),
               ('rooms', 'rooms_to_objects', 'objects')]
 
-
-def _get_spark_dsg():
-    try:
-        dsg = importlib.import_module('spark_dsg')
-    except ImportError:
-        raise ValueError("spark_dsg not found.")
-    return dsg
 
 class Hydra_mp3d_data:
     """
@@ -31,7 +23,7 @@ class Hydra_mp3d_data:
         self._file_path = file_path
         
         # extract complete dsg (for book-keeping) and room-object graph
-        dsg = _get_spark_dsg()
+        dsg = get_spark_dsg()
         self._G = dsg.DynamicSceneGraph.load(file_path)
         dsg.add_bounding_boxes_to_layer(self._G, dsg.DsgLayers.ROOMS)
         self._G_ro = get_room_object_dsg(self._G, verbose=False)
@@ -44,7 +36,7 @@ class Hydra_mp3d_data:
 
     def add_room_labels(self, mp3d_info, angle_deg=-90):
         """add room labels using ground-truth mp3d house segmentation"""
-        dsg = _get_spark_dsg()
+        dsg = get_spark_dsg()
         dsg.mp3d.add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg)
 
     def add_object_edges(self, threshold_near=2.0, max_near=2.0, max_on=0.2):

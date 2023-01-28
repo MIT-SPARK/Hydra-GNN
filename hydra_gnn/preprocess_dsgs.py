@@ -1,8 +1,7 @@
-import warnings
+import importlib
 import numpy as np
 import torch
 from torch_geometric.data import (Data, HeteroData)
-import spark_dsg as dsg
 
 OBJECT_LABELS = [
     3,  # chair
@@ -68,6 +67,14 @@ ROOM_LABELS = [
     'Z', # junk (reflections of mirrors, random points floating in space, etc.)
     '\x15', # Hydra-DSG unlabeled room
 ]
+
+
+def get_spark_dsg():
+    try:
+        dsg = importlib.import_module('spark_dsg')
+    except ImportError:
+        raise ValueError("spark_dsg not found.")
+    return dsg
 
 
 def _is_on(G, n1, n2, max_on):
@@ -177,6 +184,7 @@ def add_object_connectivity(G, threshold_near=2.0, max_near=2.0, max_on=0.2, min
     Add object connectivity between objects in the same room given an room-object dsg.
     """
     room_to_objects = dict()
+    dsg = get_spark_dsg()
     for node in G.get_layer(dsg.DsgLayers.OBJECTS).nodes:
         room_id = node.get_parent()
         if room_id is None:
@@ -210,6 +218,7 @@ def get_room_object_dsg(G, verbose=False):
     """Create a room-object DSG by copying and connecting room and object nodes from the input DSG."""
 
     # create an empty DSG and copy all room nodes
+    dsg = get_spark_dsg()
     G_room_object = dsg.DynamicSceneGraph()
     sibling_map = {}
     for room_node in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
