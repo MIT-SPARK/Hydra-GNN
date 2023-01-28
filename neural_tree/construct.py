@@ -6,7 +6,6 @@ from torch_geometric.utils import to_networkx
 
 import sys
 sys.path.append('../')
-from datasets.mp3d import MP3D
 from neural_tree.h_tree.generate_junction_tree_hierarchies import sample_and_generate_jth
 
 
