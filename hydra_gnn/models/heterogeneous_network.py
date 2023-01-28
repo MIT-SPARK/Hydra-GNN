@@ -42,10 +42,6 @@ class HeterogeneousNetwork(nn.Module):
                 self.convs.append(build_hetero_conv(conv_block, EDGE_TYPES, hidden_dim_dict, hidden_dim_dict))
             self.convs.append(build_hetero_conv(conv_block, EDGE_TYPES, hidden_dim_dict, output_dim_dict))            
 
-        # batch normalization - siyi: todo
-        if self.conv_block == 'GIN':
-            raise NotImplemented
-
     def forward(self, data):
         x_dict, edge_index_dict = data.x_dict, data.edge_index_dict
 
