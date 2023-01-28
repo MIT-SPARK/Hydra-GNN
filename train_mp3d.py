@@ -9,6 +9,7 @@ import os
 import argparse
 import pickle
 import yaml
+import torch
 import pandas as pd
 from pprint import pprint
 
@@ -28,6 +29,8 @@ if __name__ == "__main__":
     parser.add_argument('--train_val_ratio', default=None, type=float, nargs=2, 
                         help='training and validation ratio')
     args = parser.parse_args()
+
+    print(f"cuda available: {torch.cuda.is_available()}")
     
     # parse config file
     with open(args.config_file, 'r') as input_file:
@@ -38,7 +41,6 @@ if __name__ == "__main__":
     # setup log folder, accuracy files
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
-    # shutil.copy(args.config_file, output_dir)
     
     # load data and data split
     if args.train_val_ratio is None:
