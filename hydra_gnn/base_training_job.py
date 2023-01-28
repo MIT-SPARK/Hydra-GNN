@@ -16,18 +16,19 @@ class BaseTrainingJob:
 
         # initialize training parameters
         self._training_params = self.create_default_params()
-        self.update_training_params(network_params=network_params)
+        self._update_training_params(network_params=network_params)
         
         input_dim = dataset_dict['train'].get_data(0).num_node_features()
         
         if network_type == 'homogeneous':
-            self.update_training_params(network_params={'input_dim': input_dim,
+            self._update_training_params(network_params={'input_dim': input_dim,
                 'output_dim': dataset_dict['train'].get_data(0).num_room_labels()})
         else:
-            self.update_training_params(network_params={'input_dim_dict': input_dim,
+            self._update_training_params(network_params={'input_dim_dict': input_dim,
                 'output_dim': dataset_dict['train'].get_data(0).num_room_labels()})
     
         # initialize network
+        self.clean_up_network_params()
         self._net = self.initialize_network()
         if double_precision:
             self._net.double()
@@ -53,12 +54,12 @@ class BaseTrainingJob:
 
     def clean_up_network_params(self):
         if self._training_params['network_params']['conv_block'][:3] == 'GAT':
-            delattr(self._training_params['network_params'],'num_layers' )
-            delattr(self._training_params['network_params'],'hidden_dim' )
+            self._training_params['network_params'].pop('num_layers')
+            self._training_params['network_params'].pop('hidden_dim')
         else:
-            delattr(self._training_params['network_params'],'GAT_hidden_dims' )
-            delattr(self._training_params['network_params'],'GAT_heads' )
-            delattr(self._training_params['network_params'],'GAT_concats' )
+            self._training_params['network_params'].pop('GAT_hidden_dims')
+            self._training_params['network_params'].pop('GAT_heads')
+            self._training_params['network_params'].pop('GAT_concats')
 
     def print_training_params(self, f=sys.stdout):
         for params, params_dict in self._training_params.items():
@@ -66,7 +67,7 @@ class BaseTrainingJob:
             for param_name, value in params_dict.items():
                 print('   {}: {}'.format(param_name, value), file=f)
 
-    def update_training_params(self, network_params=None, optimization_params=None):
+    def _update_training_params(self, network_params=None, optimization_params=None):
         if network_params is not None:
             for key in network_params:
                 self._training_params['network_params'][key] = network_params[key]
@@ -88,7 +89,7 @@ class BaseTrainingJob:
     def train(self, log_folder, optimization_params=None, decay_epochs=100, decay_rate=1.0,
               early_stop_window=-1, verbose=False):
         # update parameters
-        self.update_training_params(optimization_params=optimization_params)
+        self._update_training_params(optimization_params=optimization_params)
         optimization_params = self._training_params['optimization_params']
 
         # move training to gpu if available
