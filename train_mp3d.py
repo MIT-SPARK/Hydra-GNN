@@ -150,5 +150,5 @@ if __name__ == "__main__":
         # save param and accuracy
         output_data_list = [f"experiment_{experiment_i}"] + [param_dict[key] for key in log_params] + \
             val_accuracy_list + test_accuracy_list
-        df = df.append(pd.DataFrame(data=[output_data_list], columns = df.columns))
+        df = pd.concat([df, pd.DataFrame(data=[output_data_list], columns = df.columns)])
         df.to_csv(accuracy_file_path, index=False)
