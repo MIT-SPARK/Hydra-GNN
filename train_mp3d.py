@@ -3,9 +3,9 @@ from hydra_gnn.utils import PROJECT_DIR, MP3D_BENCHMARK_DIR, HYDRA_TRAJ_DIR, \
 from hydra_gnn.mp3d_utils import generate_mp3d_split, read_mp3d_split
 from hydra_gnn.mp3d_dataset import Hydra_mp3d_dataset
 from hydra_gnn.base_training_job import BaseTrainingJob
-import datetime
 import random
 import os
+import shutil
 import argparse
 import pickle
 import yaml
@@ -24,6 +24,8 @@ param_dict_list = pgrid(lr, weight_decay, GAT_hidden_dims, dropout)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--task_id', default=0, type=int, help="slurm array task ID")
+    parser.add_argument('--num_tasks', default=1, type=int, help="total number of slurm array tasks")
     parser.add_argument('--config_file', default=os.path.join(PROJECT_DIR, 'config/mp3d_default_config.yaml'),
                         help='traiing config file')
     parser.add_argument('--train_val_ratio', default=None, type=float, nargs=2, 
@@ -35,11 +37,18 @@ if __name__ == "__main__":
     # parse config file
     with open(args.config_file, 'r') as input_file:
         config = yaml.safe_load(input_file)
+    task_id = args.task_id
+    num_tasks = args.num_tasks
     dataset_path = os.path.join(PROJECT_DIR, config['data']['file_path'])
     output_dir = os.path.join(PROJECT_DIR, config['logger']['output_dir'])
+    assert task_id < num_tasks
 
     # setup log folder, accuracy files
-    if not os.path.exists(output_dir):
+    print(f"output direcotry: {output_dir}")
+    if os.path.exists(output_dir):
+        if task_id == 0:
+            input("Output directory exists. Existing contents might be over-written. Press any key to proceed...")
+    else:
         os.mkdir(output_dir)
     
     # load data and data split
@@ -77,10 +86,9 @@ if __name__ == "__main__":
         f"  test: {dataset_dict['test'].num_scenes()} scenes {len(dataset_dict['test'])} graphs")
 
     # master output directory 
-    dt_str = datetime.datetime.now().strftime('%m%d%H%M')
-    experiment_output_dir = os.path.join(output_dir, dt_str)
-    os.mkdir(experiment_output_dir)
-    print(f"Saving output to {experiment_output_dir}")
+    # dt_str = datetime.datetime.now().strftime('%m%d%H%M')
+    # experiment_output_dir = os.path.join(output_dir, dt_str)
+    # os.mkdir(experiment_output_dir)
 
     # log resutls
     log_params = list(param_dict_list[0].keys())
@@ -89,8 +97,11 @@ if __name__ == "__main__":
             ['test_' + str(i) for i in range(config['run_control']['num_runs'])])
 
     # update parameter
-    for experiment_i, param_dict in enumerate(param_dict_list):
+    num_param_set = len(param_dict_list)
+    experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
+    for experiment_i in experiment_id_list:
         print(f"{experiment_i+1} / {len(param_dict_list)}")
+        param_dict = param_dict_list[experiment_i]
         
         # todo: this is for temporary GAT tuning with single attention head
         if config['network']['conv_block'][:3] == 'GAT':
@@ -107,9 +118,17 @@ if __name__ == "__main__":
         pprint('config:')
         pprint(config)
 
-        # save config
-        experiment_output_dir_i = os.path.join(experiment_output_dir, f"experiment_{experiment_i}")
+        # clean up output directory
+        experiment_output_dir_i = os.path.join(output_dir, f"experiment_{experiment_i}")
+        if os.path.exists(experiment_output_dir_i):
+            shutil.rmtree(experiment_output_dir_i)
         os.mkdir(experiment_output_dir_i)
+
+        accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
+        if os.path.exists(accuracy_file_path):
+            os.remove(accuracy_file_path)
+
+        # save config
         with open(os.path.join(experiment_output_dir_i, 'config.yaml'), 'w') as output_file:
             yaml.dump(config, output_file, default_flow_style=False)
 
@@ -132,4 +151,4 @@ if __name__ == "__main__":
         output_data_list = [f"experiment_{experiment_i}"] + [param_dict[key] for key in log_params] + \
             val_accuracy_list + test_accuracy_list
         df = df.append(pd.DataFrame(data=[output_data_list], columns = df.columns))
-        df.to_csv(os.path.join(experiment_output_dir, 'accuracy.csv'), index=False)
+        df.to_csv(accuracy_file_path, index=False)
