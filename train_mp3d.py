@@ -4,6 +4,7 @@ from hydra_gnn.mp3d_utils import generate_mp3d_split, read_mp3d_split
 from hydra_gnn.mp3d_dataset import Hydra_mp3d_dataset
 from hydra_gnn.base_training_job import BaseTrainingJob
 import random
+from statistics import mean
 import os
 import shutil
 import argparse
@@ -94,7 +95,8 @@ if __name__ == "__main__":
     log_params = list(param_dict_list[0].keys())
     df = pd.DataFrame(columns=['log_dir'] + log_params + \
         ['val_' + str(i) for i in range(config['run_control']['num_runs'])] + \
-            ['test_' + str(i) for i in range(config['run_control']['num_runs'])])
+            ['test_' + str(i) for i in range(config['run_control']['num_runs'])]) + \
+                ['avg num_epochs', 'avg training_time/ecpho (s)', 'avg test_time (s)']
 
     # update parameter
     num_param_set = len(param_dict_list)
@@ -135,20 +137,27 @@ if __name__ == "__main__":
         # run experiment
         test_accuracy_list = []
         val_accuracy_list = []
+        training_time_list = []
+        training_epoch_list = []
+        test_time_list = []
         for j in range(config['run_control']['num_runs']):
             train_job = BaseTrainingJob(network_type=config['data']['type'],
                                         dataset_dict=dataset_dict, 
                                         network_params=config['network'])
-            model, best_acc = train_job.train(experiment_output_dir_i + '/' + str(j), 
+            model, best_acc, info = train_job.train(experiment_output_dir_i + '/' + str(j), 
                                             optimization_params=config['optimization'],
                                             early_stop_window=config['run_control']['early_stop_window'], 
                                             verbose=True)
 
             val_accuracy_list.append(best_acc[0] * 100)
             test_accuracy_list.append(best_acc[1] * 100)
+            training_time_list.append(info['training_time'])
+            training_epoch_list.append(info['num_epochs'])
+            test_time_list.append(info['test_time'])
 
         # save param and accuracy
         output_data_list = [f"experiment_{experiment_i}"] + [param_dict[key] for key in log_params] + \
-            val_accuracy_list + test_accuracy_list
+            val_accuracy_list + test_accuracy_list + \
+                [mean(training_epoch_list), sum(training_time_list) / sum(training_epoch_list), mean(test_time_list)]
         df = pd.concat([df, pd.DataFrame(data=[output_data_list], columns = df.columns)])
         df.to_csv(accuracy_file_path, index=False)
