@@ -26,6 +26,8 @@ if __name__ == "__main__":
                         help="output file name")
     parser.add_argument('--output_dir', default=os.path.join(PROJECT_DIR, 'output/preprocessed_mp3d'),
                         help="training and validation ratio")
+    parser.add_argument('--expand_rooms', action='store_true',
+                        help="expand room segmentation from existing places segmentation in the dataset file")
     parser.add_argument('--save_htree', action='store_true', 
                         help="store htree data")
     parser.add_argument('--save_homogeneous', action='store_true', 
@@ -70,10 +72,10 @@ if __name__ == "__main__":
 
             if args.save_htree:
                 data = Hydra_mp3d_htree_data(scene_id=scene_id, trajectory_id=trajectory_id, \
-                    num_frames=num_frames, file_path=file_path)
+                    num_frames=num_frames, file_path=file_path, expand_rooms=args.expand_rooms)
             else:
                 data = Hydra_mp3d_data(scene_id=scene_id, trajectory_id=trajectory_id, \
-                    num_frames=num_frames, file_path=file_path)
+                    num_frames=num_frames, file_path=file_path, expand_rooms=args.expand_rooms)
 
             # skip dsg without room node or without object node
             if data.get_room_object_dsg().num_nodes() == 0:

@@ -1,7 +1,9 @@
 from hydra_gnn.preprocess_dsgs import get_spark_dsg, get_room_object_dsg, convert_label_to_y, add_object_connectivity
-from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch
+from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch, HTREE_VIRTUAL_NODE_TYPES
 import os.path
 import torch.utils
+import networkx as nx
+from torch_geometric.utils import to_networkx
 from torch_geometric.data import HeteroData
 
 
@@ -15,7 +17,7 @@ class Hydra_mp3d_data:
     """
     data class that takes in a hydra-mp3d trajectory, converts and stores torch data for training.
     """
-    def __init__(self, scene_id, trajectory_id, num_frames, file_path):
+    def __init__(self, scene_id, trajectory_id, num_frames, file_path, expand_rooms=False):
         assert os.path.exists(file_path)
         self._scene_id = scene_id
         self._trajectory_id = trajectory_id
@@ -25,6 +27,8 @@ class Hydra_mp3d_data:
         # extract complete dsg (for book-keeping) and room-object graph
         dsg = get_spark_dsg()
         self._G = dsg.DynamicSceneGraph.load(file_path)
+        if expand_rooms:
+            self._G = dsg.mp3d.expand_rooms(self._G)
         dsg.add_bounding_boxes_to_layer(self._G, dsg.DsgLayers.ROOMS)
         self._G_ro = get_room_object_dsg(self._G, verbose=False)
 
@@ -190,7 +194,7 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
     def to_homogeneous(self):
         raise NotImplemented
 
-
+    
 class Hydra_mp3d_dataset(torch.utils.data.Dataset):
     def __init__(self, split):
         assert split in ('train', 'val', 'test'), "Invalid data split."
