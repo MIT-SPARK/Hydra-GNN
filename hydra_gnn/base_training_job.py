@@ -200,3 +200,30 @@ class BaseTrainingJob:
             total += torch.numel(label)
 
         return correct / total
+
+    def test_individual_graph(self, dataset, model=None):
+        if model is not None:
+            self._net = model
+
+        self._net.eval()
+        device = next(self._net.parameters()).device
+
+        correct_list = []
+        total_list = []
+        for data in dataset:
+            with torch.no_grad():
+                pred = self._net(data.to(device)).argmax(dim=1)
+                if self._network_type == 'homogeneous':
+                    label = data.y[data.room_mask]
+                elif self._network_type == 'heterogeneous':
+                    label = data['rooms'].y
+                else:
+                    label = data['room_virtual'].y
+                mask = (label != self._training_params['network_params']['ignored_label'])
+
+                pred = pred[mask]
+                label = label[mask]
+
+            correct_list.append(pred.eq(label).sum().item())
+            total_list.append(torch.numel(label))
+        return correct_list, total_list
