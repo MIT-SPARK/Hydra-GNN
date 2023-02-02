@@ -110,11 +110,8 @@ class BaseTrainingJob:
 
         # train
         max_val_acc = 0
-        max_test_acc = 0  # If val_loader is not None, compute using the model weights that lead to best_val_acc
         best_model_state = None
         writer = SummaryWriter(log_folder)
-        if val_loader is None:
-            early_stop_window = -1  # do not use early stopping if there's no validation set
 
         tic = time.perf_counter()
         early_stop_step = 0
@@ -149,46 +146,35 @@ class BaseTrainingJob:
                 writer.add_scalar('train result', train_result, epoch)
 
             # validation and testing
-            if val_loader is not None:
-                val_result = self.test(val_loader)
-                writer.add_scalar('validation result', val_result, epoch)
-                if val_result > max_val_acc:
-                    max_val_acc = val_result
-                    best_model_state = deepcopy(self._net.state_dict())
-                    early_stop_step = 0
-                if verbose and (epoch + 1) % 10 == 0:
-                    print('Epoch {:03}. Loss: {:.4f}. Train accuracy: {:.4f}. Validation accuracy: {:.4f}.'
-                          .format(epoch, total_loss, train_result, val_result))
-                if early_stop_step == early_stop_window and epoch > early_stop_window:
-                    if verbose:
-                        print('Early stopping condition reached at {} epoch.'.format(epoch))
-                    break
-            else:
-                test_result = self.test(test_loader)
-                writer.add_scalar('test result', test_result, epoch)
-                if test_result > max_test_acc:
-                    max_test_acc = test_result
-                    best_model_state = deepcopy(self._net.state_dict())
-                if verbose and (epoch + 1) % 10 == 0:
-                    print('Epoch {:03}. Loss: {:.4f}. Train accuracy: {:.4f}. Test accuracy: {:.4f}.'.
-                          format(epoch, total_loss, train_result, test_result))
+            val_result = self.test(val_loader)
+            writer.add_scalar('validation result', val_result, epoch)
+            if val_result > max_val_acc:
+                max_val_acc = val_result
+                best_model_state = deepcopy(self._net.state_dict())
+                early_stop_step = 0
+            if verbose and (epoch + 1) % 10 == 0:
+                print('Epoch {:03}. Loss: {:.4f}. Train accuracy: {:.4f}. Validation accuracy: {:.4f}.'
+                        .format(epoch, total_loss, train_result, val_result))
+            if early_stop_step == early_stop_window and epoch > early_stop_window:
+                if verbose:
+                    print('Early stopping condition reached at {} epoch.'.format(epoch))
+                break
 
         toc = time.perf_counter()
         print('Training completed (time elapsed: {:.4f} s). '.format(toc - tic))
+        info = {'training_time': toc - tic, 'num_epochs': epoch + 1}
 
         self._net.load_state_dict(best_model_state)
 
-        if val_loader is not None:
-            tic = time.perf_counter()
-            test_result = self.test(test_loader)
-            toc = time.perf_counter()
-            print('Testing completed (time elapsed: {:.4f} s). '.format(toc - tic))
-            print('Best validation accuracy: {:.4f}, corresponding test accuracy: {:.4f}.'.
-                  format(max_val_acc, test_result))
-            return self._net, (max_val_acc, test_result)
-        else:
-            print('Best test accuracy: {:.4f}.'.format(max_test_acc))
-            return self._net, max_test_acc
+        tic = time.perf_counter()
+        test_result = self.test(test_loader)
+        toc = time.perf_counter()
+        print('Testing completed (time elapsed: {:.4f} s). '.format(toc - tic))
+        print('Best validation accuracy: {:.4f}, corresponding test accuracy: {:.4f}.'.
+                format(max_val_acc, test_result))
+        info['test_time'] = toc - tic
+
+        return self._net, (max_val_acc, test_result), info
 
     def test(self, data_loader):
         self._net.eval()
