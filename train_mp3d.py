@@ -95,8 +95,8 @@ if __name__ == "__main__":
     log_params = list(param_dict_list[0].keys())
     df = pd.DataFrame(columns=['log_dir'] + log_params + \
         ['val_' + str(i) for i in range(config['run_control']['num_runs'])] + \
-            ['test_' + str(i) for i in range(config['run_control']['num_runs'])]) + \
-                ['avg num_epochs', 'avg training_time/ecpho (s)', 'avg test_time (s)']
+            ['test_' + str(i) for i in range(config['run_control']['num_runs'])] + \
+                ['avg num_epochs', 'avg training_time/ecpho (s)', 'avg test_time (s)'])
 
     # update parameter
     num_param_set = len(param_dict_list)
