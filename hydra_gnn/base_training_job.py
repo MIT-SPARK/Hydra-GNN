@@ -95,6 +95,9 @@ class BaseTrainingJob:
         # move training to gpu if available
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self._net.to(device)
+        if device == "cpu":
+            print("Warning: not training on GPU!")
+        
         # create data loader
         train_loader = DataLoader(self.get_dataset('train'), batch_size=optimization_params['batch_size'],
             shuffle=optimization_params['shuffle'])
