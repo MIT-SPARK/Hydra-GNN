@@ -1,5 +1,5 @@
 from hydra_gnn.preprocess_dsgs import get_spark_dsg, get_room_object_dsg, convert_label_to_y, add_object_connectivity
-from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch, HTREE_VIRTUAL_NODE_TYPES
+from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch, HTREE_NODE_TYPES, HTREE_EDGE_TYPES
 import os.path
 import torch.utils
 import networkx as nx
@@ -190,6 +190,21 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
         self._torch_data['object_virtual'].y = torch.tensor(object_y)
         self._torch_data['room_virtual'].y = torch.tensor(room_y)
+    
+    def get_diameters(self):
+        assert isinstance(self._torch_data, HeteroData)
+
+        # generate a data copy with just htree nodes (i.e. remove all virtual nodes)
+        data_htree = HeteroData()
+        for node_type in HTREE_NODE_TYPES:
+            data_htree[node_type].pos = self._torch_data[node_type].pos
+        for edge_type in HTREE_EDGE_TYPES:
+            data_htree[edge_type].edge_index = self._torch_data[edge_type].edge_index
+        data_htree = data_htree.to_homogeneous()
+
+        # find diameter of each connected component using networkx
+        nx_data = to_networkx(data_htree).to_undirected()
+        return [nx.diameter(nx_data.subgraph(c)) for c in nx.connected_components(nx_data)]
 
     def to_homogeneous(self):
         raise NotImplemented

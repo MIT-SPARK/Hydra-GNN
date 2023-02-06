@@ -208,8 +208,7 @@ class BaseTrainingJob:
         self._net.eval()
         device = next(self._net.parameters()).device
 
-        correct_list = []
-        total_list = []
+        output_list = []  # list of (correct, total) tuple
         for data in dataset:
             with torch.no_grad():
                 pred = self._net(data.to(device)).argmax(dim=1)
@@ -223,7 +222,6 @@ class BaseTrainingJob:
 
                 pred = pred[mask]
                 label = label[mask]
+                output_list.append((pred.eq(label).sum().item(), torch.numel(label)))
 
-            correct_list.append(pred.eq(label).sum().item())
-            total_list.append(torch.numel(label))
-        return correct_list, total_list
+        return output_list
