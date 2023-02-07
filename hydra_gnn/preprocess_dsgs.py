@@ -317,9 +317,9 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
         object_y = [object_label_dict[l] for l in torch_data.label[torch_data.node_masks[2]].tolist()]
         room_y = [room_label_dict[chr(l)] for l in torch_data.label[torch_data.node_masks[4]].tolist()]
 
-        torch_data.y = torch.zeros(torch_data.label.shape)
-        torch_data.y[torch_data.node_masks[2]] = torch.tensor(object_y)
-        torch_data.y[torch_data.node_masks[4]] = torch.tensor(room_y)
+        torch_data.y = torch.zeros(torch_data.label.shape, dtype=torch.int32)
+        torch_data.y[torch_data.node_masks[2]] = torch.tensor(object_y, dtype=torch.int32)
+        torch_data.y[torch_data.node_masks[4]] = torch.tensor(room_y, dtype=torch.int32)
 
     elif isinstance(torch_data, HeteroData):
         assert len(torch_data.node_types) == 2, len(torch_data.node_types)
