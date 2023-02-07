@@ -154,9 +154,9 @@ class Hydra_mp3d_data:
 
 
 class Hydra_mp3d_htree_data(Hydra_mp3d_data):
-    def __init__(self, scene_id, trajectory_id, num_frames, file_path):
+    def __init__(self, scene_id, trajectory_id, num_frames, file_path, expand_rooms=False):
         super(Hydra_mp3d_htree_data, self).__init__(
-            scene_id, trajectory_id, num_frames, file_path)
+            scene_id, trajectory_id, num_frames, file_path, expand_rooms)
 
     def compute_torch_data(self, use_heterogeneous: bool, node_converter, object_synonyms=[], \
         room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')], double_precision=False,
