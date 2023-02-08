@@ -65,8 +65,8 @@ def build_GAT_hetero_conv(edge_types, input_dim_dict, output_dim_dict,
         conv_module_list_dict[source, edge_name, target] = \
             build_GAT_conv_layers((input_dim_dict[source], input_dim_dict[target]), 
                                   GAT_hidden_dims + [output_dim_dict[target]], 
-                GAT_heads, GAT_concats, dropout, add_self_loop=(source==target), 
-                edge_dim=edge_dim, fill_value=fill_value)
+                                  GAT_heads, GAT_concats, dropout, add_self_loop=(source==target),
+                                  edge_dim=edge_dim, fill_value=fill_value)
     # assemble each layer using HeteroConv
     convs = nn.ModuleList()
     for i in range(len(GAT_heads)):

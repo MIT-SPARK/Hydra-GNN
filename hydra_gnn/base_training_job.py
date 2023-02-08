@@ -86,6 +86,9 @@ class BaseTrainingJob:
     def get_dataset(self, split_name):
         return self._dataset_dict[split_name]
 
+    def ignored_label(self):
+        return self._training_params['network_params']['ignored_label']
+
     def train(self, log_folder, optimization_params=None, decay_epochs=100, decay_rate=1.0,
               early_stop_window=-1, verbose=False):
         # update parameters
