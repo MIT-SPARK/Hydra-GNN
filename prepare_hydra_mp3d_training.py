@@ -18,6 +18,7 @@ max_near=2.0
 max_on=0.2
 object_synonyms=[]
 room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]
+room_removal_func = lambda room: not (room.has_children() or room.has_siblings())
 
 
 if __name__ == "__main__":
@@ -39,8 +40,9 @@ if __name__ == "__main__":
     
     print("Saving torch graphs as htree:", args.save_htree)
     print("Saving torch graphs as homogeneous torch data:", args.save_homogeneous)
+    print("Saving torch graphs with expand_rooms:", args.expand_rooms)
     print("Output directory:", args.output_dir) 
-    print("Output data files:", f"{args.output_filename}, {param_filename}, {skipped_filename}")
+    print("Output data files:", f"{args.output_filename}, ({param_filename}, {skipped_filename})")
     if os.path.exists(os.path.join(args.output_dir, args.output_filename)):
         input("Output data file exists. Press any key to proceed...")
 
@@ -89,7 +91,7 @@ if __name__ == "__main__":
                 continue
 
             # parepare torch data
-            data.add_room_labels(gt_house_info, angle_deg=-90)
+            data.add_room_labels(gt_house_info, angle_deg=-90, room_removal_func=room_removal_func)
             data.add_object_edges(threshold_near=threshold_near, max_near=max_near, max_on=max_on)
             data.compute_torch_data(
                 use_heterogeneous=(not args.save_homogeneous),
@@ -106,11 +108,18 @@ if __name__ == "__main__":
     with open(os.path.join(args.output_dir, args.output_filename), 'wb') as output_file:
         pickle.dump(data_list, output_file)
 
+    # save dataset stat
+    data_stat_dir = os.path.join(args.output_dir, os.path.splitext(args.output_filename)[0] + '_stat')
+    if os.path.exists(data_stat_dir):
+        os.rmdir(data_stat_dir)
+    else:
+        os.mkdir(data_stat_dir)
+    # save room connectivity threshold and label mapping
     output_params = dict(threshold_near=threshold_near, max_near=max_near, max_on=max_on)
     label_dict = data.get_label_dict()
-    with open(os.path.join(args.output_dir, param_filename), 'w') as output_file:
+    with open(os.path.join(data_stat_dir, param_filename), 'w') as output_file:
         yaml.dump(output_params, output_file, default_flow_style=False)
         yaml.dump(label_dict, output_file, default_flow_style=False)
-
-    with open(os.path.join(args.output_dir, skipped_filename), 'w') as output_file:
+    # save skipped trajectories
+    with open(os.path.join(data_stat_dir, skipped_filename), 'w') as output_file:
         yaml.dump(skipped_json_files, output_file, default_flow_style=False)

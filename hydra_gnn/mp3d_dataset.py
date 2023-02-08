@@ -38,10 +38,16 @@ class Hydra_mp3d_data:
         self._object_label_dict = None
         self._room_label_dict = None
 
-    def add_room_labels(self, mp3d_info, angle_deg=-90):
+    def add_room_labels(self, mp3d_info, angle_deg=-90, room_removal_func=None):
         """add room labels using ground-truth mp3d house segmentation"""
         dsg = get_spark_dsg()
         dsg.mp3d.add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg)
+
+        if room_removal_func is not None:    
+            # change room semantic label to '\x15' (i.e. None) based on room_removal_func
+            for room in self._G_ro.get_layer(dsg.DsgLayers.ROOMS).nodes:
+                if room_removal_func(room):
+                    room.attributes.semantic_label = ord('\x15')
 
     def add_object_edges(self, threshold_near=2.0, max_near=2.0, max_on=0.2):
         """add object connectivity to self._G_ro"""
@@ -191,20 +197,33 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         self._torch_data['object_virtual'].y = torch.tensor(object_y)
         self._torch_data['room_virtual'].y = torch.tensor(room_y)
     
-    def get_diameters(self):
+    def get_diameters(self, valid_room_labels=None):
         assert isinstance(self._torch_data, HeteroData)
 
         # generate a data copy with just htree nodes (i.e. remove all virtual nodes)
         data_htree = HeteroData()
         for node_type in HTREE_NODE_TYPES:
             data_htree[node_type].pos = self._torch_data[node_type].pos
+            data_htree[node_type].label = self._torch_data[node_type].label
         for edge_type in HTREE_EDGE_TYPES:
             data_htree[edge_type].edge_index = self._torch_data[edge_type].edge_index
         data_htree = data_htree.to_homogeneous()
 
         # find diameter of each connected component using networkx
-        nx_data = to_networkx(data_htree).to_undirected()
-        return [nx.diameter(nx_data.subgraph(c)) for c in nx.connected_components(nx_data)]
+        nx_data = to_networkx(data_htree, node_attrs=['label']).to_undirected()
+        diameters = []
+        for c in nx.connected_components(nx_data):
+            subgraph = nx_data.subgraph(c)
+            if valid_room_labels is None:
+                diameters.append(nx.diameter(subgraph))
+            else:   # skip subgraphs where all rooms are unlabeld -- i.e. ignored by training
+                # todo: this code does not distinguish room and object nodes -- but works on hydra labels
+                room_idx = [idx for idx, data_dict in subgraph.nodes.items() \
+                    if data_dict['label'] in valid_room_labels]
+                if len(room_idx) != 0:
+                    diameters.append(nx.diameter(subgraph))
+
+        return diameters
 
     def to_homogeneous(self):
         raise NotImplemented
