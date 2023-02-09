@@ -1,8 +1,7 @@
-import warnings
+import importlib
 import numpy as np
 import torch
 from torch_geometric.data import (Data, HeteroData)
-import spark_dsg as dsg
 
 OBJECT_LABELS = [
     3,  # chair
@@ -70,7 +69,15 @@ ROOM_LABELS = [
 ]
 
 
-def _is_on(G, n1, n2, threshold_on=1.0):
+def get_spark_dsg():
+    try:
+        dsg = importlib.import_module('spark_dsg')
+    except ImportError:
+        raise ValueError("spark_dsg not found.")
+    return dsg
+
+
+def _is_on(G, n1, n2, max_on):
     """
     Check whether n1 is "on" n2 or n2 is "on" n1
     Requires that the n1 center is inside n2 on xy plane, and n1 is above
@@ -84,7 +91,7 @@ def _is_on(G, n1, n2, threshold_on=1.0):
     xy_dist = np.abs(pos1[0:2] - pos2[0:2])
     z_dist = np.abs(pos1[2] - pos2[2])
     n1_above_n2 = pos1[2] > pos2[2]
-    new_thresh = threshold_on * (size1[2] + size2[2]) / 2
+    new_thresh = max_on + (size1[2] + size2[2]) / 2
 
     if all(xy_dist <= size2[0:2] / 2) and n1_above_n2 and z_dist <= new_thresh:
         return True
@@ -145,8 +152,7 @@ def _is_under(G, n1, n2):
 def _is_near(G, n1, n2, threshold_near=2.0, max_near=2.0):
     """
     Check whether n1 is "near" n2 or n2 is "near" n1
-    Requires that either n1 or n2 is inside the other node on the xy place and
-    that the positions on the z-axis are distinct.
+    Requires that n1 and n2 are nearby in all xyz directions.
     """
     pos1 = G.get_position(n1.id.value)
     pos2 = G.get_position(n2.id.value)
@@ -173,8 +179,12 @@ def _dist(G, n1, n2):
     return np.linalg.norm(G.get_position(n1) - G.get_position(n2))
 
 
-def add_object_connectivity(G, threshold_near=2.0, threshold_on=1.0, max_near=2.0):
+def add_object_connectivity(G, threshold_near=2.0, max_near=2.0, max_on=0.2, min_above=1.0):
+    """
+    Add object connectivity between objects in the same room given an room-object dsg.
+    """
     room_to_objects = dict()
+    dsg = get_spark_dsg()
     for node in G.get_layer(dsg.DsgLayers.OBJECTS).nodes:
         room_id = node.get_parent()
         if room_id is None:
@@ -187,14 +197,11 @@ def add_object_connectivity(G, threshold_near=2.0, threshold_on=1.0, max_near=2.
 
         cmp_nodes = room_to_objects[room_id]
         for cmp_node in cmp_nodes:
-            is_on = _is_on(G, node, cmp_node, threshold_on=threshold_on)
-            is_above = _is_above(
-                G,
-                node,
-                cmp_node,
-                threshold_near=threshold_near,
-                threshold_on=threshold_on,
-            )
+            is_on = _is_on(G, node, cmp_node, max_on=max_on)
+            is_above = False
+            # is_above = _is_above(
+            #     G, node, cmp_node, threshold_near=threshold_near, min_above=min_above,
+            # )
             is_under = _is_under(G, node, cmp_node)
             is_near = _is_near(
                 G, node, cmp_node, threshold_near=threshold_near, max_near=max_near
@@ -211,6 +218,7 @@ def get_room_object_dsg(G, verbose=False):
     """Create a room-object DSG by copying and connecting room and object nodes from the input DSG."""
 
     # create an empty DSG and copy all room nodes
+    dsg = get_spark_dsg()
     G_room_object = dsg.DynamicSceneGraph()
     sibling_map = {}
     for room_node in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
@@ -227,8 +235,8 @@ def get_room_object_dsg(G, verbose=False):
     for object_node in G.get_layer(dsg.DsgLayers.OBJECTS).nodes:
         if not object_node.has_parent():
             invalid_objects.append(object_node)
-            warnings.warn(
-                f"{object_node.id} has no parent node in the input DSG.")
+            if verbose:
+                print(f"{object_node.id} has no parent node in the input DSG.")
             continue
 
         # insert edge through object -> place -> room edges in G
@@ -266,7 +274,9 @@ def get_room_object_dsg(G, verbose=False):
 
 
 def _get_label_dict(labels, synonyms=None):
-    """Get mapping from (Hydra) labels to integer label index while grouping synonym labels. """
+    """
+    Get mapping from (Hydra) labels to integer label index while grouping synonym labels. 
+    """
     
     if synonyms is None or len(synonyms) == 0:
         return dict(zip(labels, range(len(labels))))
@@ -290,7 +300,7 @@ def _get_label_dict(labels, synonyms=None):
 def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM_LABELS,
                        object_synonyms=[], room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]):
     """
-    Convert labels
+    Convert (Hydra) room and object labels to training label y, and return hydra label to training label mappings.
     """
 
     # converting object labels from mp3d integer label to filtered integer label
@@ -307,12 +317,12 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
         object_y = [object_label_dict[l] for l in torch_data.label[torch_data.node_masks[2]].tolist()]
         room_y = [room_label_dict[chr(l)] for l in torch_data.label[torch_data.node_masks[4]].tolist()]
 
-        torch_data.y = torch.zeros(torch_data.label.shape, dtype=torch.int64)
-        torch_data.y[torch_data.node_masks[2]] = torch.tensor(object_y)
-        torch_data.y[torch_data.node_masks[4]] = torch.tensor(room_y)
+        torch_data.y = torch.zeros(torch_data.label.shape, dtype=torch.int32)
+        torch_data.y[torch_data.node_masks[2]] = torch.tensor(object_y, dtype=torch.int32)
+        torch_data.y[torch_data.node_masks[4]] = torch.tensor(room_y, dtype=torch.int32)
 
     elif isinstance(torch_data, HeteroData):
-        assert len(torch_data.node_types) == 2
+        assert len(torch_data.node_types) == 2, len(torch_data.node_types)
         assert 'objects' in torch_data.node_types
         assert 'rooms' in torch_data.node_types
 
@@ -328,12 +338,20 @@ def convert_label_to_y(torch_data, object_labels=OBJECT_LABELS, room_labels=ROOM
     return object_label_dict, room_label_dict
 
 
-def _hydra_object_feature_converter(hydra_colormap_data, word2vec_model):
+def hydra_object_feature_converter(hydra_colormap_data, word2vec_model):
+    """
+    Returns a function that takes in hydra object label and returns word2vec semantic embedding vector.
+    """
     return lambda i: np.mean(
         [word2vec_model[s] for s in hydra_colormap_data['name'][i].split("_") if s != "of"], axis=0,)
 
 
-def hydra_node_converter(object_feature_converter, room_feature_converter=lambda i:np.empty(0)):
+def hydra_node_converter(object_feature_converter, room_feature_converter=lambda i:np.zeros(300)):
+    """
+    Returns a function that computes the node feature vector x for Hydra dsg to torch data conversion.
+    Here x is consists of 3d position, 3d (axis-aligned) bounding box size, 
+    and semantic feature computed by input feature converter function.
+    """
     def node_converter(G, x):
         if x.layer == 2:    # object
             return np.hstack((x.attributes.position, 
