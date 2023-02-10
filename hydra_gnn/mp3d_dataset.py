@@ -38,8 +38,8 @@ class Hydra_mp3d_data:
         self._object_label_dict = None
         self._room_label_dict = None
 
-    def add_room_labels(self, mp3d_info, angle_deg=-90, room_removal_func=None):
-        """add room labels using ground-truth mp3d house segmentation"""
+    def add_dsg_room_labels(self, mp3d_info, angle_deg=-90, room_removal_func=None):
+        """add room labels to room-object dsg using ground-truth mp3d house segmentation"""
         dsg = get_spark_dsg()
         dsg.mp3d.add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg)
 
@@ -197,7 +197,7 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         self._torch_data['object_virtual'].y = torch.tensor(object_y)
         self._torch_data['room_virtual'].y = torch.tensor(room_y)
     
-    def get_diameters(self, valid_room_labels=None):
+    def get_diameters(self, valid_room_labels=None, with_room_ids=False):
         assert isinstance(self._torch_data, HeteroData)
 
         # generate a data copy with just htree nodes (i.e. remove all virtual nodes)
@@ -212,6 +212,7 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         # find diameter of each connected component using networkx
         nx_data = to_networkx(data_htree, node_attrs=['label']).to_undirected()
         diameters = []
+        valid_room_ids = []
         for c in nx.connected_components(nx_data):
             subgraph = nx_data.subgraph(c)
             if valid_room_labels is None:
@@ -222,8 +223,12 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
                     if data_dict['label'] in valid_room_labels]
                 if len(room_idx) != 0:
                     diameters.append(nx.diameter(subgraph))
-
-        return diameters
+                    valid_room_ids.append(room_idx)
+        
+        if with_room_ids:
+            return diameters, valid_room_ids
+        else:
+            return diameters
 
     def to_homogeneous(self):
         raise NotImplemented

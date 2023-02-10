@@ -37,7 +37,7 @@ def test_Hydra_mp3d_data(test_data_dir):
 
     # add room label and add object edges to room-object graph
     gt_house_info = load_mp3d_info(gt_house_file)
-    data.add_room_labels(gt_house_info, angle_deg=-90)
+    data.add_dsg_room_labels(gt_house_info, angle_deg=-90)
 
     assert data.get_room_object_dsg().get_layer(dsg.DsgLayers.OBJECTS).num_edges() == 0
     data.add_object_edges(threshold_near=2.0, threshold_on=1.0, max_near=2.0)
@@ -191,12 +191,12 @@ def test_Hydra_mp3d_dataset(test_data_dir):
         object_feature_converter=hydra_object_feature_converter(
             pytest.colormap_data, pytest.word2vec_model)
         gt_house_info1 = load_mp3d_info(gt_house_file1)
-        data1.add_room_labels(gt_house_info1, angle_deg=-90)
+        data1.add_dsg_room_labels(gt_house_info1, angle_deg=-90)
         data1.add_object_edges(threshold_near=2.0, threshold_on=1.0, max_near=2.0)
         data1.compute_torch_data(use_heterogeneous=True,
             node_converter=hydra_node_converter(object_feature_converter, lambda i: np.empty(300)))
         gt_house_info2 = load_mp3d_info(gt_house_file2)
-        data2.add_room_labels(gt_house_info2, angle_deg=-90)
+        data2.add_dsg_room_labels(gt_house_info2, angle_deg=-90)
         data2.add_object_edges(threshold_near=2.0, threshold_on=1.0, max_near=2.0)
         data2.compute_torch_data(use_heterogeneous=True,
             node_converter=hydra_node_converter(object_feature_converter, lambda i: np.empty(300)))

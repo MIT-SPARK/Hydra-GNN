@@ -18,7 +18,8 @@ max_near=2.0
 max_on=0.2
 object_synonyms=[]
 room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')]
-room_removal_func = lambda room: not (room.has_children() or room.has_siblings())
+# room_removal_func = lambda room: not (room.has_children() or room.has_siblings())
+room_removal_func = lambda room: not (len(room.children()) > 1 or room.has_siblings())
 
 
 if __name__ == "__main__":
@@ -91,7 +92,7 @@ if __name__ == "__main__":
                 continue
 
             # parepare torch data
-            data.add_room_labels(gt_house_info, angle_deg=-90, room_removal_func=room_removal_func)
+            data.add_dsg_room_labels(gt_house_info, angle_deg=-90, room_removal_func=room_removal_func)
             data.add_object_edges(threshold_near=threshold_near, max_near=max_near, max_on=max_on)
             data.compute_torch_data(
                 use_heterogeneous=(not args.save_homogeneous),
