@@ -124,11 +124,8 @@ if __name__ == "__main__":
         experiment_output_dir_i = os.path.join(output_dir, f"experiment_{experiment_i}")
         if os.path.exists(experiment_output_dir_i):
             shutil.rmtree(experiment_output_dir_i)
+            print(f"Overwritting experiment output folder {experiment_output_dir_i}")
         os.mkdir(experiment_output_dir_i)
-
-        accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
-        if os.path.exists(accuracy_file_path):
-            os.remove(accuracy_file_path)
 
         # save config
         with open(os.path.join(experiment_output_dir_i, 'config.yaml'), 'w') as output_file:
@@ -156,6 +153,7 @@ if __name__ == "__main__":
             test_time_list.append(info['test_time'])
 
         # save param and accuracy
+        accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
         output_data_list = [f"experiment_{experiment_i}"] + [param_dict[key] for key in log_params] + \
             val_accuracy_list + test_accuracy_list + \
                 [mean(training_epoch_list), sum(training_time_list) / sum(training_epoch_list), mean(test_time_list)]
