@@ -16,9 +16,9 @@ from pprint import pprint
 
 
 # parameter sweep setup
-GAT_hidden_dims = plist('GAT_hidden_dims', [[16], [32], [16, 16], [32, 32]])
-dropout = plist('dropout', [0.2, 0.4, 0.6])
-lr = plist('lr', [0.001])
+GAT_hidden_dims = plist('GAT_hidden_dims', [[32, 32, 32]])
+dropout = plist('dropout', [0.2])
+lr = plist('lr', [0.002])
 weight_decay = plist('weight_decay', [0.0])
 param_dict_list = pgrid(lr, weight_decay, GAT_hidden_dims, dropout)
 
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     parser.add_argument('--task_id', default=0, type=int, help="slurm array task ID")
     parser.add_argument('--num_tasks', default=1, type=int, help="total number of slurm array tasks")
     parser.add_argument('--config_file', default=os.path.join(PROJECT_DIR, 'config/mp3d_default_config.yaml'),
-                        help='traiing config file')
+                        help='training config file')
     parser.add_argument('--train_val_ratio', default=None, type=float, nargs=2, 
                         help='training and validation ratio')
     args = parser.parse_args()
