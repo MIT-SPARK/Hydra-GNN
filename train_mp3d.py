@@ -16,7 +16,7 @@ from pprint import pprint
 
 
 # parameter sweep setup
-GAT_hidden_dims = plist('GAT_hidden_dims', [[32, 32, 32]])
+GAT_hidden_dims = plist('GAT_hidden_dims', [[32, 32], [64, 64], [32, 32, 32], [64, 64, 64]])
 dropout = plist('dropout', [0.2])
 lr = plist('lr', [0.002])
 weight_decay = plist('weight_decay', [0.0])

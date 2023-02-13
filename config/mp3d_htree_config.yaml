@@ -3,7 +3,7 @@ data:
     type: "neural_tree"
 
 run_control:
-    num_runs: 1
+    num_runs: 5
     early_stop_window: 300
 
 network:
@@ -17,7 +17,7 @@ network:
 
 optimization:
     lr: 0.001
-    num_epochs: 200
+    num_epochs: 500
     weight_decay: 0.0001
     batch_size: 2048
 
