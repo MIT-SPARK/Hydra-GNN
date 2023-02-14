@@ -245,7 +245,10 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
             return diameters
 
     def to_homogeneous(self):
-        raise NotImplemented
+        if isinstance(self._torch_data, HeteroData):
+            room_virutal_idx = list(self._torch_data.x_dict.keys()).index('room_virtual')
+            Hydra_mp3d_data.to_homogeneous(self)
+            self._torch_data.room_mask = (self._torch_data.node_type == room_virutal_idx)
 
     
 class Hydra_mp3d_dataset(torch.utils.data.Dataset):
