@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn.norm.batch_norm import BatchNorm
@@ -20,20 +21,22 @@ class HomogeneousNetwork(nn.Module):
         """
         super(HomogeneousNetwork, self).__init__()
         self.conv_block = conv_block
-        self.num_layers = num_layers if conv_block != 'GAT' else len(GAT_heads)
+        self.num_layers = num_layers if conv_block[:3] != 'GAT' else len(GAT_heads)
         self.dropout = dropout
 
         # message passing
         self.convs = nn.ModuleList()
-        if self.conv_block != 'GAT':  # GAT dimensions are different than others
+        if self.conv_block == 'GAT':
+            self.convs = build_GAT_conv_layers(input_dim, GAT_hidden_dims + [output_dim], GAT_heads,
+                GAT_concats, dropout=dropout)
+        elif self.conv_block == 'GAT_edge':
+            self.convs = build_GAT_conv_layers(input_dim, GAT_hidden_dims + [output_dim], GAT_heads,
+                GAT_concats, dropout=dropout, edge_dim=3, add_self_loop=True, fill_value=torch.zeros(3, dtype=torch.float64))
+        else:  # GAT dimensions are different than others
             self.convs.append(build_conv_layer(self.conv_block, input_dim, hidden_dim))
             for _ in range(1, self.num_layers - 1):
                 self.convs.append(build_conv_layer(self.conv_block, hidden_dim, hidden_dim))
             self.convs.append(build_conv_layer(self.conv_block, hidden_dim, output_dim))
-
-        else:
-            self.convs = build_GAT_conv_layers(input_dim, GAT_hidden_dims + [output_dim], GAT_heads,
-                GAT_concats, dropout=dropout)
 
         # batch normalization
         if self.conv_block == 'GIN':
@@ -47,11 +50,14 @@ class HomogeneousNetwork(nn.Module):
 
         # x = F.dropout(x, p=self.dropout, training=self.training)
         for i in range(self.num_layers):
-            x = self.convs[i](x, edge_index=edge_index)
+            if self.conv_block == 'GAT_edge':
+                x = self.convs[i](x, edge_index=edge_index, edge_attr=data.edge_attr)
+            else:
+                x = self.convs[i](x, edge_index=edge_index)
             if i != self.num_layers - 1:    # activation and dropout, except for the last iteration
                 if self.conv_block == 'GIN':
                     x = self.batch_norms[i](x)
-                x = F.relu(x) if self.conv_block != 'GAT' else F.elu(x)
+                x = F.relu(x) if self.conv_block[:3] != 'GAT' else F.elu(x)
                 x = F.dropout(x, p=self.dropout, training=self.training)
 
         return x[room_mask, :]

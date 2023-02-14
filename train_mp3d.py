@@ -68,9 +68,8 @@ if __name__ == "__main__":
     with open(dataset_path, 'rb') as input_file:
         data_list = pickle.load(input_file)
     if config['network']['conv_block'] == 'GAT_edge':
-        assert config['data']['type'] != 'homogeneous'
         [data.compute_relative_pos() for data in data_list]
-    elif config['data']['type'] == 'homogeneous':
+    if config['data']['type'] == 'homogeneous':
         [data.to_homogeneous() for data in data_list]
     
     for data in data_list:
