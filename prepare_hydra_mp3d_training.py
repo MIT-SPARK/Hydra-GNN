@@ -30,6 +30,8 @@ if __name__ == "__main__":
                         help="training and validation ratio")
     parser.add_argument('--expand_rooms', action='store_true',
                         help="expand room segmentation from existing places segmentation in the dataset file")
+    parser.add_argument('--repartition_rooms', action='store_true',
+                        help="re-segment rooms using gt segmentation in the dataset file")
     parser.add_argument('--save_htree', action='store_true', 
                         help="store htree data")
     parser.add_argument('--save_homogeneous', action='store_true', 
@@ -79,7 +81,7 @@ if __name__ == "__main__":
             else:
                 data = Hydra_mp3d_data(scene_id=scene_id, trajectory_id=trajectory_id, \
                     num_frames=num_frames, file_path=file_path, expand_rooms=args.expand_rooms)
-
+            
             # skip dsg without room node or without object node
             if data.get_room_object_dsg().num_nodes() == 0:
                 skipped_json_files['none'].append(os.path.join(trajectory_name, json_file_name))
@@ -92,7 +94,11 @@ if __name__ == "__main__":
                 continue
 
             # parepare torch data
-            data.add_dsg_room_labels(gt_house_info, angle_deg=-90, room_removal_func=room_removal_func)
+            data.add_dsg_room_labels(gt_house_info, angle_deg=-90, room_removal_func=room_removal_func, \
+                repartition_rooms=args.repartition_rooms)
+            if args.repartition_rooms and data.get_room_object_dsg().get_layer(dsg.DsgLayers.OBJECTS).num_nodes() == 0:
+                skipped_json_files['no object'].append(os.path.join(trajectory_name, json_file_name))
+                continue
             data.add_object_edges(threshold_near=threshold_near, max_near=max_near, max_on=max_on)
             data.compute_torch_data(
                 use_heterogeneous=(not args.save_homogeneous),

@@ -38,10 +38,15 @@ class Hydra_mp3d_data:
         self._object_label_dict = None
         self._room_label_dict = None
 
-    def add_dsg_room_labels(self, mp3d_info, angle_deg=-90, room_removal_func=None):
+    def add_dsg_room_labels(self, mp3d_info, angle_deg=-90, room_removal_func=None, repartition_rooms=False):
         """add room labels to room-object dsg using ground-truth mp3d house segmentation"""
         dsg = get_spark_dsg()
-        dsg.mp3d.add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg)
+        if repartition_rooms:   # repartition rooms (i.e. replace room nodes) with ground-truth room segmentation 
+            self._G = dsg.mp3d.repartition_rooms(self._G, mp3d_info, angle_deg=angle_deg)
+            dsg.add_bounding_boxes_to_layer(self._G, dsg.DsgLayers.ROOMS)
+            self._G_ro = get_room_object_dsg(self._G, verbose=False)
+        else:
+            dsg.mp3d.add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg, min_iou_threshold=0.5)
 
         if room_removal_func is not None:    
             # change room semantic label to '\x15' (i.e. None) based on room_removal_func
@@ -205,12 +210,13 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         for node_type in HTREE_NODE_TYPES:
             data_htree[node_type].pos = self._torch_data[node_type].pos
             data_htree[node_type].label = self._torch_data[node_type].label
+            data_htree[node_type].clique_has = self._torch_data[node_type].clique_has
         for edge_type in HTREE_EDGE_TYPES:
             data_htree[edge_type].edge_index = self._torch_data[edge_type].edge_index
         data_htree = data_htree.to_homogeneous()
 
         # find diameter of each connected component using networkx
-        nx_data = to_networkx(data_htree, node_attrs=['label']).to_undirected()
+        nx_data = to_networkx(data_htree, node_attrs=['label', 'clique_has']).to_undirected()
         diameters = []
         valid_room_ids = []
         for c in nx.connected_components(nx_data):
@@ -221,9 +227,11 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
                 # todo: this code does not distinguish room and object nodes -- but works on hydra labels
                 room_idx = [idx for idx, data_dict in subgraph.nodes.items() \
                     if data_dict['label'] in valid_room_labels]
+                # this assumes objects are saved before rooms in htree construction
+                offset = self._torch_data['object_virtual'].num_nodes
                 if len(room_idx) != 0:
                     diameters.append(nx.diameter(subgraph))
-                    valid_room_ids.append(room_idx)
+                    valid_room_ids.append(set(subgraph.nodes[idx]['clique_has'] - offset for idx in room_idx))
         
         if with_room_ids:
             return diameters, valid_room_ids
