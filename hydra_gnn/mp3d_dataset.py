@@ -2,6 +2,7 @@ from hydra_gnn.preprocess_dsgs import get_spark_dsg, get_room_object_dsg, conver
 from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch, HTREE_NODE_TYPES, HTREE_EDGE_TYPES
 import os.path
 import torch.utils
+import torch.nn.functional
 import networkx as nx
 from torch_geometric.utils import to_networkx
 from torch_geometric.data import HeteroData
@@ -116,6 +117,11 @@ class Hydra_mp3d_data:
         
     def to_homogeneous(self):
         if isinstance(self._torch_data, HeteroData):
+            num_node_features = max([self._torch_data[node_type].num_node_features \
+                for node_type in self._torch_data.x_dict])
+            for node_type in self._torch_data.x_dict:
+                self._torch_data[node_type].x = torch.nn.functional.pad(self._torch_data[node_type].x, \
+                    (0, num_node_features - self._torch_data[node_type].x.shape[1], 0, 0), mode='constant', value=0)
             self._torch_data = self._torch_data.to_homogeneous(add_edge_type=False)
             self._torch_data.room_mask = (self._torch_data.node_type == 1)
     
