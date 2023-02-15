@@ -184,7 +184,7 @@ class BaseTrainingJob:
 
     def test(self, data_loader):
         self._net.eval()
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = next(self._net.parameters()).device
 
         correct = 0
         total = 0
