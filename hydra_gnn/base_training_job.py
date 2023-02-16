@@ -96,15 +96,15 @@ class BaseTrainingJob:
         optimization_params = self._training_params['optimization_params']
 
         # move training to gpu if available
-        # num_gpus = torch.cuda.device_count()
-        # if num_gpus == 0:
-        #     device = torch.device("cpu")
-        # elif num_gpus == 1:
-        #     device = torch.device("cuda:0")
-        # elif num_gpus > 1:
-        #     gpu_mem = ((i, torch.cuda.mem_get_info(device=i)[0]) for i in range(num_gpus))
-        #     device = torch.device(f"cuda:{max(gpu_mem, key=lambda x: x[1])[0]}")
-        device = torch.device(f"cuda:{gpu_index}")
+        num_gpus = torch.cuda.device_count()
+        if num_gpus == 0:
+            device = torch.device("cpu")
+        elif gpu_index < num_gpus:
+            # gpu_mem = ((i, torch.cuda.mem_get_info(device=i)[0]) for i in range(num_gpus))
+            # device = torch.device(f"cuda:{max(gpu_mem, key=lambda x: x[1])[0]}")
+            device = torch.device(f"cuda:{gpu_index}")
+        else:
+            device = torch.device("cuda:0")
         self._net.to(device)
         if device == "cpu":
             print("Warning: not training on GPU!")
