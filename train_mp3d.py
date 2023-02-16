@@ -31,6 +31,8 @@ if __name__ == "__main__":
                         help='training config file')
     parser.add_argument('--train_val_ratio', default=None, type=float, nargs=2, 
                         help='training and validation ratio')
+    parser.add_argument('--same_val_test', action='store_true', 
+                        help="use the same scenes for validation and testing (trajctory 0-1 for validation, 2-4 for testing)")
     args = parser.parse_args()
 
     print(f"cuda available: {torch.cuda.is_available()}")
@@ -72,18 +74,30 @@ if __name__ == "__main__":
     if config['data']['type'] == 'homogeneous':
         [data.to_homogeneous() for data in data_list]
     
-    for data in data_list:
-        if data.get_data_info()['scene_id'] in split_dict['scenes_train']:
-            dataset_dict['train'].add_data(data)
-        elif data.get_data_info()['scene_id'] in split_dict['scenes_val']:
-            dataset_dict['val'].add_data(data)
-        elif data.get_data_info()['scene_id'] in split_dict['scenes_test']:
-            dataset_dict['test'].add_data(data)
-        else:
-            raise RuntimeError(f"Founnd invalid scene id in input data file {dataset_path}.")
+    if args.same_val_test:
+        for data in data_list:
+            if data.get_data_info()['scene_id'] in split_dict['scenes_train']:
+                dataset_dict['train'].add_data(data)
+            else:
+                if data.get_data_info()['trajectory_id'] in ['0', '1']:
+                    dataset_dict['val'].add_data(data)
+                elif data.get_data_info()['trajectory_id'] in ['2', '3', '4']:
+                    dataset_dict['test'].add_data(data)
+                else:
+                    raise RuntimeError(f"Found invalid trajectory id in input data file {dataset_path}")
+    else:
+        for data in data_list:
+            if data.get_data_info()['scene_id'] in split_dict['scenes_train']:
+                dataset_dict['train'].add_data(data)
+            elif data.get_data_info()['scene_id'] in split_dict['scenes_val']:
+                dataset_dict['val'].add_data(data)
+            elif data.get_data_info()['scene_id'] in split_dict['scenes_test']:
+                dataset_dict['test'].add_data(data)
+            else:
+                raise RuntimeError(f"Founnd invalid scene id in input data file {dataset_path}.")
     print(f"  training: {dataset_dict['train'].num_scenes()} scenes {len(dataset_dict['train'])} graphs\n"
-        f"  validation: {dataset_dict['val'].num_scenes()} scenes {len(dataset_dict['val'])} graphs\n"
-        f"  test: {dataset_dict['test'].num_scenes()} scenes {len(dataset_dict['test'])} graphs")
+          f"  validation: {dataset_dict['val'].num_scenes()} scenes {len(dataset_dict['val'])} graphs\n"
+          f"  test: {dataset_dict['test'].num_scenes()} scenes {len(dataset_dict['test'])} graphs")
 
     # master output directory 
     # dt_str = datetime.datetime.now().strftime('%m%d%H%M')
