@@ -62,6 +62,8 @@ if __name__ == "__main__":
         print("Preparing training data using specified split ratio.")
         random.seed(0)
         split_dict = generate_mp3d_split(HYDRA_TRAJ_DIR, args.train_val_ratio[0], args.train_val_ratio[1])
+    if args.same_val_test:
+        print("Regenerating val/test split using trajectories -- 0-1 for training and 2-4 for testing.")
 
     # create data lists
     dataset_dict = {'train': Hydra_mp3d_dataset('train'),
@@ -118,15 +120,16 @@ if __name__ == "__main__":
         print(f"{experiment_i+1} / {len(param_dict_list)}")
         param_dict = param_dict_list[experiment_i]
         
-        # todo: this is for temporary GAT tuning with single attention head
         if config['network']['conv_block'][:3] == 'GAT':
+            # todo: this is for temporary GAT tuning with single attention head
             param_dict['GAT_heads'] = len(param_dict['GAT_hidden_dims']) * [1] + [1]
             param_dict['GAT_concats'] = len(param_dict['GAT_hidden_dims']) * [False] + [False]
 
-        if len(param_dict['GAT_heads']) != len(param_dict['GAT_hidden_dims']) + 1 or \
-            len(param_dict['GAT_concats']) != len(param_dict['GAT_hidden_dims']) + 1:
-            print('  Skip - invalid GAT param')
-            continue
+            # check GAT params
+            if len(param_dict['GAT_heads']) != len(param_dict['GAT_hidden_dims']) + 1 or \
+                len(param_dict['GAT_concats']) != len(param_dict['GAT_hidden_dims']) + 1:
+                print('  Skip - invalid GAT param')
+                continue
 
         update_existing_keys(config['network'], param_dict)
         update_existing_keys(config['optimization'], param_dict)
@@ -156,7 +159,8 @@ if __name__ == "__main__":
                                         network_params=config['network'])
             model, best_acc, info = train_job.train(experiment_output_dir_i + '/' + str(j), 
                                             optimization_params=config['optimization'],
-                                            early_stop_window=config['run_control']['early_stop_window'], 
+                                            early_stop_window=config['run_control']['early_stop_window'],
+                                            gpu_index=task_id,
                                             verbose=True)
 
             val_accuracy_list.append(best_acc[0] * 100)

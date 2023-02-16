@@ -90,7 +90,7 @@ class BaseTrainingJob:
         return self._training_params['network_params']['ignored_label']
 
     def train(self, log_folder, optimization_params=None, decay_epochs=100, decay_rate=1.0,
-              early_stop_window=-1, verbose=False):
+              early_stop_window=-1, verbose=False, gpu_index=0):
         # update parameters
         self._update_training_params(optimization_params=optimization_params)
         optimization_params = self._training_params['optimization_params']
@@ -104,7 +104,7 @@ class BaseTrainingJob:
         # elif num_gpus > 1:
         #     gpu_mem = ((i, torch.cuda.mem_get_info(device=i)[0]) for i in range(num_gpus))
         #     device = torch.device(f"cuda:{max(gpu_mem, key=lambda x: x[1])[0]}")
-        device = torch.device("cuda:3")
+        device = torch.device(f"cuda:{gpu_index}")
         self._net.to(device)
         if device == "cpu":
             print("Warning: not training on GPU!")
