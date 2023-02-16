@@ -96,11 +96,21 @@ class BaseTrainingJob:
         optimization_params = self._training_params['optimization_params']
 
         # move training to gpu if available
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        # num_gpus = torch.cuda.device_count()
+        # if num_gpus == 0:
+        #     device = torch.device("cpu")
+        # elif num_gpus == 1:
+        #     device = torch.device("cuda:0")
+        # elif num_gpus > 1:
+        #     gpu_mem = ((i, torch.cuda.mem_get_info(device=i)[0]) for i in range(num_gpus))
+        #     device = torch.device(f"cuda:{max(gpu_mem, key=lambda x: x[1])[0]}")
+        device = torch.device("cuda:3")
         self._net.to(device)
         if device == "cpu":
             print("Warning: not training on GPU!")
-        
+        else:
+            print(f"Training on GPU {device.index}.")
+
         # create data loader
         train_loader = DataLoader(self.get_dataset('train'), batch_size=optimization_params['batch_size'],
             shuffle=optimization_params['shuffle'])
@@ -144,7 +154,7 @@ class BaseTrainingJob:
             total_loss /= len(train_loader.dataset)
             writer.add_scalar('loss', total_loss, epoch)
 
-            writer.add_scalar('lr', opt.param_groups[0]["lr"], epoch)
+            # writer.add_scalar('lr', opt.param_groups[0]["lr"], epoch)
             my_lr_scheduler.step()
 
             if verbose:
@@ -170,8 +180,6 @@ class BaseTrainingJob:
         print('Training completed (time elapsed: {:.4f} s). '.format(toc - tic))
         info = {'training_time': toc - tic, 'num_epochs': epoch + 1}
 
-        self._net.load_state_dict(best_model_state)
-
         tic = time.perf_counter()
         test_result = self.test(test_loader)
         toc = time.perf_counter()
@@ -180,11 +188,14 @@ class BaseTrainingJob:
                 format(max_val_acc, test_result))
         info['test_time'] = toc - tic
 
+        self._net.load_state_dict(best_model_state)
+        torch.cuda.empty_cache()
+
         return self._net, (max_val_acc, test_result), info
 
     def test(self, data_loader):
         self._net.eval()
-        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        device = next(self._net.parameters()).device
 
         correct = 0
         total = 0
