@@ -154,6 +154,7 @@ if __name__ == "__main__":
         training_epoch_list = []
         test_time_list = []
         for j in range(config['run_control']['num_runs']):
+            print(f"\nRun {j + 1} / {config['run_control']['num_runs']}:")
             train_job = BaseTrainingJob(network_type=config['data']['type'],
                                         dataset_dict=dataset_dict, 
                                         network_params=config['network'])
