@@ -117,7 +117,7 @@ if __name__ == "__main__":
     num_param_set = len(param_dict_list)
     experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
     for experiment_i in experiment_id_list:
-        print(f"{experiment_i+1} / {len(param_dict_list)}")
+        print(f"\nExperiment {experiment_i+1} / {len(param_dict_list)}")
         param_dict = param_dict_list[experiment_i]
         
         if config['network']['conv_block'][:3] == 'GAT':
