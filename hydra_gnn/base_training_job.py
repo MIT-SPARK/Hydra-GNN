@@ -181,6 +181,8 @@ class BaseTrainingJob:
         print('Training completed (time elapsed: {:.4f} s). '.format(toc - tic))
         info = {'training_time': toc - tic, 'num_epochs': epoch + 1}
 
+        # load best model to compute test result
+        self._net.load_state_dict(best_model_state)
         tic = time.perf_counter()
         test_result = self.test(test_loader)
         toc = time.perf_counter()
@@ -189,7 +191,6 @@ class BaseTrainingJob:
                 format(max_val_acc, test_result))
         info['test_time'] = toc - tic
 
-        self._net.load_state_dict(best_model_state)
         torch.cuda.empty_cache()
 
         return self._net, (max_val_acc, test_result), info
