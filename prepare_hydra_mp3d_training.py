@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
             # parepare torch data
             data.add_dsg_room_labels(gt_house_info, angle_deg=-90, room_removal_func=room_removal_func, \
-                repartition_rooms=args.repartition_rooms)
+                min_iou_threshold=0.5, repartition_rooms=args.repartition_rooms)
             if args.repartition_rooms and data.get_room_object_dsg().get_layer(dsg.DsgLayers.OBJECTS).num_nodes() == 0:
                 skipped_json_files['no object'].append(os.path.join(trajectory_name, json_file_name))
                 continue
