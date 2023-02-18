@@ -27,6 +27,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--task_id', default=0, type=int, help="slurm array task ID")
     parser.add_argument('--num_tasks', default=1, type=int, help="total number of slurm array tasks")
+    parser.add_argument('--gpu_index', default=-1, type=int, help="gpu index (default: task_id)")
     parser.add_argument('--config_file', default=os.path.join(PROJECT_DIR, 'config/mp3d_default_config.yaml'),
                         help='training config file')
     parser.add_argument('--train_val_ratio', default=None, type=float, nargs=2, 
@@ -42,6 +43,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(input_file)
     task_id = args.task_id
     num_tasks = args.num_tasks
+    gpu_index = args.gpu_index if args.gpu_index != -1 else task_id
     dataset_path = os.path.join(PROJECT_DIR, config['data']['file_path'])
     output_dir = os.path.join(PROJECT_DIR, config['logger']['output_dir'])
     assert task_id < num_tasks
@@ -161,7 +163,7 @@ if __name__ == "__main__":
             model, best_acc, info = train_job.train(experiment_output_dir_i + '/' + str(j), 
                                             optimization_params=config['optimization'],
                                             early_stop_window=config['run_control']['early_stop_window'],
-                                            gpu_index=task_id,
+                                            gpu_index=gpu_index,
                                             verbose=True)
 
             val_accuracy_list.append(best_acc[0] * 100)

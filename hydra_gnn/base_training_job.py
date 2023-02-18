@@ -90,12 +90,13 @@ class BaseTrainingJob:
         return self._training_params['network_params']['ignored_label']
 
     def train(self, log_folder, optimization_params=None, decay_epochs=100, decay_rate=1.0,
-              early_stop_window=-1, verbose=False, gpu_index=0):
+              early_stop_window=-1, min_log_epoch=0, verbose=False, gpu_index=0):
         # update parameters
         self._update_training_params(optimization_params=optimization_params)
         optimization_params = self._training_params['optimization_params']
 
         # move training to gpu if available
+        assert gpu_index >= 0
         num_gpus = torch.cuda.device_count()
         if num_gpus == 0:
             device = torch.device("cpu")
@@ -164,7 +165,7 @@ class BaseTrainingJob:
             # validation and testing
             val_result = self.test(val_loader)
             writer.add_scalar('validation result', val_result, epoch)
-            if val_result > max_val_acc:
+            if epoch >= min_log_epoch and val_result > max_val_acc:
                 max_val_acc = val_result
                 best_model_state = deepcopy(self._net.state_dict())
                 early_stop_step = 0
