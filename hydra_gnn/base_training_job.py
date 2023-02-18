@@ -2,6 +2,7 @@ from hydra_gnn.models import HomogeneousNetwork, HeterogeneousNetwork, NeuralTre
 import sys
 import time
 from copy import deepcopy
+import numpy as np
 import torch
 import torch.optim as optim
 from torch_geometric.loader import DataLoader
@@ -195,12 +196,15 @@ class BaseTrainingJob:
 
         return self._net, (max_val_acc, test_result), info
 
-    def test(self, data_loader):
+    def test(self, data_loader, get_per_label_accuracy=False):
         self._net.eval()
         device = next(self._net.parameters()).device
 
         correct = 0
         total = 0
+        if get_per_label_accuracy:
+            num_rooms = self._training_params['network_params']['output_dim'] - 1
+            accuracy_matrix = np.zeros((num_rooms, 3), dtype=int)
         for batch in data_loader:
             with torch.no_grad():
                 pred = self._net(batch.to(device)).argmax(dim=1)
@@ -217,8 +221,21 @@ class BaseTrainingJob:
 
             correct += pred.eq(label).sum().item()
             total += torch.numel(label)
+            if get_per_label_accuracy:
+                for l in range(num_rooms):
+                    if l == self._training_params['network_params']['ignored_label']:
+                        continue
+                    # number of label i; number of true positive; number of false positive
+                    label_l = (label == l)
+                    pred_l = (pred == l)
+                    accuracy_matrix[l, 0] = label_l.sum().item()
+                    accuracy_matrix[l, 1] = (label_l & pred_l).sum().item()
+                    accuracy_matrix[l, 2] = ((~label_l) & pred_l).sum().item()
 
-        return correct / total
+        if get_per_label_accuracy:
+            return correct / total, accuracy_matrix
+        else:
+            return correct / total
 
     def test_individual_graph(self, dataset, model=None):
         if model is not None:

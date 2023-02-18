@@ -3,6 +3,7 @@ from hydra_gnn.utils import PROJECT_DIR, MP3D_BENCHMARK_DIR, HYDRA_TRAJ_DIR, \
 from hydra_gnn.mp3d_utils import generate_mp3d_split, read_mp3d_split
 from hydra_gnn.mp3d_dataset import Hydra_mp3d_dataset
 from hydra_gnn.base_training_job import BaseTrainingJob
+from torch_geometric.loader import DataLoader
 import random
 from statistics import mean
 import os
@@ -11,6 +12,7 @@ import argparse
 import pickle
 import yaml
 import torch
+import numpy as np
 import pandas as pd
 from pprint import pprint
 
@@ -160,11 +162,25 @@ if __name__ == "__main__":
             train_job = BaseTrainingJob(network_type=config['data']['type'],
                                         dataset_dict=dataset_dict, 
                                         network_params=config['network'])
-            model, best_acc, info = train_job.train(experiment_output_dir_i + '/' + str(j), 
+            model, best_acc, info = train_job.train(f"{experiment_output_dir_i}/{j}", 
                                             optimization_params=config['optimization'],
                                             early_stop_window=config['run_control']['early_stop_window'],
                                             gpu_index=gpu_index,
                                             verbose=True)
+            # log per label accuracy
+            train_accuracy, train_accuracy_matrix = \
+                train_job.test(DataLoader(train_job.get_dataset('train'), batch_size=4096), True)
+            val_accuracy, val_accuracy_matrix = \
+                train_job.test(DataLoader(train_job.get_dataset('val'), batch_size=4096), True)
+            test_accuracy, test_accuracy_matrix = \
+                train_job.test(DataLoader(train_job.get_dataset('test'), batch_size=4096), True)
+            assert abs(val_accuracy - best_acc[0]) < 0.001, f"{val_accuracy}, {best_acc[0]}"
+            assert abs(test_accuracy - best_acc[1]) < 0.001, f"{test_accuracy}, {best_acc[1]}"
+            np.savetxt(f"{experiment_output_dir_i}/{j}/accuracy_matrix.csv", 
+                       np.concatenate((train_accuracy_matrix, val_accuracy_matrix, test_accuracy_matrix), axis=1),
+                       fmt='%i',
+                       delimiter=',', 
+                       header="num_labels[train],num_tp[train],num_fp[train],num_labels[val],num_tp[val],num_fp[val],num_labels[test],num_tp[test],num_fp[test]")
 
             val_accuracy_list.append(best_acc[0] * 100)
             test_accuracy_list.append(best_acc[1] * 100)
