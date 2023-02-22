@@ -203,8 +203,8 @@ class BaseTrainingJob:
         correct = 0
         total = 0
         if get_per_label_accuracy:
-            num_rooms = self._training_params['network_params']['output_dim'] - 1
-            accuracy_matrix = np.zeros((num_rooms, 3), dtype=int)
+            num_valid_rooms = self._training_params['network_params']['output_dim'] - 1
+            accuracy_matrix = np.zeros((num_valid_rooms, num_valid_rooms + 1), dtype=int)
         for batch in data_loader:
             with torch.no_grad():
                 pred = self._net(batch.to(device)).argmax(dim=1)
@@ -222,15 +222,17 @@ class BaseTrainingJob:
             correct += pred.eq(label).sum().item()
             total += torch.numel(label)
             if get_per_label_accuracy:
-                for l in range(num_rooms):
+                for l in range(num_valid_rooms):
                     if l == self._training_params['network_params']['ignored_label']:
                         continue
-                    # number of label i; number of true positive; number of false positive
-                    label_l = (label == l)
-                    pred_l = (pred == l)
-                    accuracy_matrix[l, 0] = label_l.sum().item()
-                    accuracy_matrix[l, 1] = (label_l & pred_l).sum().item()
-                    accuracy_matrix[l, 2] = ((~label_l) & pred_l).sum().item()
+                    # # number of label i; number of true positive; number of false positive
+                    # label_l = (label == l)
+                    # pred_l = (pred == l)
+                    # accuracy_matrix[l, 0] = label_l.sum().item()
+                    # accuracy_matrix[l, 1] = (label_l & pred_l).sum().item()
+                    # accuracy_matrix[l, 2] = ((~label_l) & pred_l).sum().item()
+                    for ll in range(num_valid_rooms + 1):
+                        accuracy_matrix[l, ll] = (pred[label == l] == ll).sum().item()
 
         if get_per_label_accuracy:
             return correct / total, accuracy_matrix

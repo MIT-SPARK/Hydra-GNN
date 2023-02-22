@@ -176,11 +176,16 @@ if __name__ == "__main__":
                 train_job.test(DataLoader(train_job.get_dataset('test'), batch_size=4096), True)
             assert abs(val_accuracy - best_acc[0]) < 0.001, f"{val_accuracy}, {best_acc[0]}"
             assert abs(test_accuracy - best_acc[1]) < 0.001, f"{test_accuracy}, {best_acc[1]}"
+            # output_header = "num_labels[train],num_tp[train],num_fp[train],num_labels[val],num_tp[val],num_fp[val],num_labels[test],num_tp[test],num_fp[test]"
+            num_labels = train_accuracy.shape[1]
+            output_header = ["num_labels[train]"] + [f",{l}[train]" for l in range(num_labels)] + \
+                            [",num_labels[val]"] + [f",{l}[train]" for l in range(num_labels)] + \
+                            [",num_labels[test]"] + [f",{l}[train]" for l in range(num_labels)]
             np.savetxt(f"{experiment_output_dir_i}/{j}/accuracy_matrix.csv", 
                        np.concatenate((train_accuracy_matrix, val_accuracy_matrix, test_accuracy_matrix), axis=1),
                        fmt='%i',
                        delimiter=',', 
-                       header="num_labels[train],num_tp[train],num_fp[train],num_labels[val],num_tp[val],num_fp[val],num_labels[test],num_tp[test],num_fp[test]")
+                       header=output_header)
 
             val_accuracy_list.append(best_acc[0] * 100)
             test_accuracy_list.append(best_acc[1] * 100)
