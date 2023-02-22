@@ -4,7 +4,7 @@ import os.path
 import torch.utils
 import torch.nn.functional
 import networkx as nx
-from torch_geometric.utils import to_networkx
+from torch_geometric.utils import to_networkx, is_undirected
 from torch_geometric.data import HeteroData
 
 
@@ -122,6 +122,9 @@ class Hydra_mp3d_data:
             num_node_features = max([self._torch_data[node_type].num_node_features \
                 for node_type in self._torch_data.x_dict])
             for node_type in self._torch_data.x_dict:
+                if self._torch_data[node_type].num_nodes == 0:
+                    self._torch_data[node_type].x = torch.empty((0, num_node_features), dtype=self._torch_data[node_type].x.dtype)
+                    continue
                 self._torch_data[node_type].x = torch.nn.functional.pad(self._torch_data[node_type].x, \
                     (0, num_node_features - self._torch_data[node_type].x.shape[1], 0, 0), mode='constant', value=0)
             self._torch_data = self._torch_data.to_homogeneous(add_edge_type=False)
@@ -248,8 +251,30 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
     def to_homogeneous(self):
         if isinstance(self._torch_data, HeteroData):
+            # log object_virtual and room_virtual node type index
+            object_virutal_idx = list(self._torch_data.x_dict.keys()).index('object_virtual')
             room_virutal_idx = list(self._torch_data.x_dict.keys()).index('room_virtual')
+            
+            # convert torch_data to homogeneous using parent class method
             Hydra_mp3d_data.to_homogeneous(self)
+
+            # find initialization edges from virtual nodes to htree (clique) nodes
+            source_node_type = self._torch_data.node_type[self._torch_data.edge_index[0]]
+            init_edge_mask = (source_node_type == object_virutal_idx) | (source_node_type == room_virutal_idx)
+            # find pool edges from htree (leaf) nodes to virtual nodes
+            target_node_type = self._torch_data.node_type[self._torch_data.edge_index[1]]
+            pool_edge_mask = (target_node_type == object_virutal_idx) | (target_node_type == room_virutal_idx)
+
+            # update edge indices
+            self._torch_data.init_edge_index = self._torch_data.edge_index[:, init_edge_mask]
+            self._torch_data.pool_edge_index = self._torch_data.edge_index[:, pool_edge_mask]
+            htree_edge_mask = ~(init_edge_mask | pool_edge_mask)
+            self._torch_data.edge_index = self._torch_data.edge_index[:, htree_edge_mask]
+            assert is_undirected(self._torch_data.edge_index)
+            if 'edge_attr' in self._torch_data:
+                self._torch_data.edge_attr = self._torch_data.edge_attr[htree_edge_mask, :]
+
+            # set room_mask to show the original room_virtual nodes -- these are the classification nodes
             self._torch_data.room_mask = (self._torch_data.node_type == room_virutal_idx)
 
     
