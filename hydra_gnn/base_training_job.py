@@ -1,4 +1,4 @@
-from hydra_gnn.models import HomogeneousNetwork, HeterogeneousNetwork, NeuralTreeNetwork
+from hydra_gnn.models import HomogeneousNetwork, HeterogeneousNetwork, NeuralTreeNetwork, HomogeneousNeuralTreeNetwork
 import sys
 import time
 from copy import deepcopy
@@ -11,7 +11,7 @@ from tensorboardX import SummaryWriter
 
 class BaseTrainingJob:
     def __init__(self, network_type, dataset_dict, network_params, double_precision=False):
-        assert network_type in ['homogeneous', 'heterogeneous', 'neural_tree']
+        assert network_type in ['homogeneous', 'heterogeneous', 'neural_tree', 'homogeneous_neural_tree']
         self._network_type = network_type
         self._dataset_dict = dataset_dict
 
@@ -21,7 +21,7 @@ class BaseTrainingJob:
         
         input_dim = dataset_dict['train'].get_data(0).num_node_features()
         
-        if network_type == 'homogeneous':
+        if network_type[:11] == 'homogeneous':
             self._update_training_params(network_params={'input_dim': input_dim,
                 'output_dim': dataset_dict['train'].get_data(0).num_room_labels()})
         else:
@@ -81,6 +81,8 @@ class BaseTrainingJob:
             return HomogeneousNetwork(**self._training_params['network_params'])
         elif self._network_type == 'heterogeneous':
             return HeterogeneousNetwork(**self._training_params['network_params'])
+        elif self._network_type == 'homogeneous_neural_tree':
+            return HomogeneousNeuralTreeNetwork(**self._training_params['network_params'])
         else:
             return NeuralTreeNetwork(**self._training_params['network_params'])
 
@@ -141,7 +143,7 @@ class BaseTrainingJob:
                 opt.zero_grad()
 
                 pred_vec = self._net(batch.to(device))
-                if self._network_type == 'homogeneous':
+                if self._network_type[:11] == 'homogeneous':
                     label = batch.y[batch.room_mask]
                 elif self._network_type == 'heterogeneous':
                     label = batch['rooms'].y
@@ -208,7 +210,7 @@ class BaseTrainingJob:
         for batch in data_loader:
             with torch.no_grad():
                 pred = self._net(batch.to(device)).argmax(dim=1)
-                if self._network_type == 'homogeneous':
+                if self._network_type[:11] == 'homogeneous':
                     label = batch.y[batch.room_mask]
                 elif self._network_type == 'heterogeneous':
                     label = batch['rooms'].y
@@ -250,7 +252,7 @@ class BaseTrainingJob:
         for data in dataset:
             with torch.no_grad():
                 pred = self._net(data.to(device)).argmax(dim=1)
-                if self._network_type == 'homogeneous':
+                if self._network_type[:11] == 'homogeneous':
                     label = data.y[data.room_mask]
                 elif self._network_type == 'heterogeneous':
                     label = data['rooms'].y
