@@ -255,6 +255,14 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
             object_virutal_idx = list(self._torch_data.x_dict.keys()).index('object_virtual')
             room_virutal_idx = list(self._torch_data.x_dict.keys()).index('room_virtual')
             
+            # add redundant y labels so that y is saved after HeteroData.to_homogeneous()
+            if 'y' in self._torch_data['room_virtual']:
+                y_dtype = self._torch_data['room_virtual'].y.dtype
+                for node_type in self._torch_data.x_dict:
+                    if 'y' not in self._torch_data[node_type]:
+                        self._torch_data[node_type].y = \
+                            -torch.ones(self._torch_data[node_type].num_nodes, dtype=y_dtype)
+            
             # convert torch_data to homogeneous using parent class method
             Hydra_mp3d_data.to_homogeneous(self)
 
