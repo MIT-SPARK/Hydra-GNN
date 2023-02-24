@@ -6,12 +6,14 @@ import torch.nn.functional as F
 
 
 class HeterogeneousNetwork(nn.Module):
-    def __init__(self, input_dim_dict, output_dim, conv_block='GraphSAGE', hidden_dim=None, num_layers=None,
-                 GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
+    def __init__(self, input_dim_dict, output_dim=None, output_dim_dict=None, conv_block='GraphSAGE', 
+                 hidden_dim=None, num_layers=None, GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
         """
         This HeterogeneousNetwork class implements message passing on heterogenoues room-object graphs.
         :param input_dim_dict: dictionary of node type to input feature dimension mapping
         :param output_dim: int, output dimension, i.e. the number of room labels
+        :param output_dim_dict: dict, output dimensions, i.e. the number of room labels and object labels
+        :param conv_block: str, message passing convolution block
         :param hidden_dim: int, the output dimension of the graph convolution (ignored if conv_block='GAT')
         :param num_layers: int, the number of graph convolution iterations (ignored if conv_block='GAT')
         :param GAT_hidden_dims: list of int, the output dimensions of GAT convolution (ignored if conv_block!='GAT')
@@ -22,12 +24,18 @@ class HeterogeneousNetwork(nn.Module):
         super(HeterogeneousNetwork, self).__init__()
         assert conv_block in ['GraphSAGE', 'GAT', 'GAT_edge', 'PointTransformer']
         self.conv_block = conv_block
+        if output_dim is not None:
+            assert output_dim_dict is None
+            self.classification_task = 'room'
+            output_dim_dict = {'rooms': output_dim, 'objects':output_dim}   # final objects states will be ignored
+        else:
+            assert output_dim_dict is not None
+            self.classification_task = 'all'
         self.num_layers = num_layers if conv_block[:3] != 'GAT' else len(GAT_heads)
         self.dropout = dropout
 
         # message passing
         hidden_dim_dict = {'rooms': hidden_dim, 'objects':hidden_dim}
-        output_dim_dict = {'rooms': output_dim, 'objects':output_dim}
         if self.conv_block == 'GAT':
             self.convs = build_GAT_hetero_conv(EDGE_TYPES, input_dim_dict, output_dim_dict, 
                 GAT_hidden_dims, GAT_heads, GAT_concats, dropout)
@@ -61,7 +69,10 @@ class HeterogeneousNetwork(nn.Module):
                 x_dict = {key: F.dropout(x, p=self.dropout, training=self.training) \
                      for key, x in x_dict.items()}
 
-        return x_dict['rooms']
+        if self.classification_task == 'room':
+            return x_dict['rooms']
+        else:
+            return x_dict['rooms'], x_dict['objects']
 
     def loss(self, pred, label, mask=None):
         if mask is None:

@@ -27,12 +27,13 @@ class NeuralTreeNetwork(nn.Module):
     This NeuralTreeNetwork class implements message passing on augmented htrees, which includes the htree and virtual 
     nodes for initialization and most message-passing pooling.
     """
-    def __init__(self, input_dim_dict, output_dim, conv_block='GraphSAGE', hidden_dim=None, num_layers=None,
-                 GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
+    def __init__(self, input_dim_dict, output_dim=None, output_dim_dict=None, conv_block='GraphSAGE', 
+                 hidden_dim=None, num_layers=None, GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
         """
         :param input_dim_dict: dictionary of node type to input feature dimension mapping
         :param output_dim: int or a tuple of int, output dimension(s), i.e. the number of labels
-        :param task: string, only 'node' classification is implemented now
+        :param output_dim_dict: dict, output dimensions, i.e. the number of room labels and object labels
+        :param conv_block: str, message passing convolution block
         :param hidden_dim: int, the output dimension of the graph convolution operations (ignored if conv_block='GAT')
         :param num_layers: int, the number of graph convolution iterations (ignored if conv_block='GAT')
         :param GAT_hidden_dims: list of int, the output dimensions of GAT convolution operations (ignored if
@@ -46,6 +47,13 @@ class NeuralTreeNetwork(nn.Module):
         super(NeuralTreeNetwork, self).__init__()
         assert conv_block in ['GraphSAGE', 'GAT', 'GAT_edge']
         self.conv_block = conv_block
+        if output_dim is not None:
+            assert output_dim_dict is None
+            self.classification_task = 'room'
+            output_dim_dict = output_dim_dict = {node_type: output_dim for node_type in HTREE_NODE_TYPES}
+        else:
+            assert output_dim_dict is not None
+            self.classification_task = 'all'
         self.num_layers = num_layers if conv_block[:3] != 'GAT' else len(GAT_heads)
         self.dropout = dropout
 
@@ -66,7 +74,6 @@ class NeuralTreeNetwork(nn.Module):
         # message passing
         mp_input_dim_dict = {node_type: input_dim_dict[node_type] for node_type in HTREE_NODE_TYPES}
         hidden_dim_dict = {node_type: hidden_dim for node_type in HTREE_NODE_TYPES}
-        output_dim_dict = {node_type: output_dim for node_type in HTREE_NODE_TYPES}
         if self.conv_block == 'GAT':
             self.convs = build_GAT_hetero_conv(HTREE_EDGE_TYPES, mp_input_dim_dict, output_dim_dict, 
                 GAT_hidden_dims, GAT_heads, GAT_concats, dropout)
@@ -110,7 +117,13 @@ class NeuralTreeNetwork(nn.Module):
         # pool room nodes' final hidden state to room_virtual nodes
         x_room = self.post_mp(x_dict['room'], edge_index_dict['room', 'r_to_rv', 'room_virtual'])\
             [0: data['room_virtual'].num_nodes]
-        return x_room
+        if self.classification_task == 'room':
+            return x_room
+        else:
+            x_object = self.post_mp(x_dict['object'], edge_index_dict['object', 'o_to_ov', 'object_virtual'])\
+                [0: data['object_virtual'].num_nodes]
+            return x_room, x_object
+        
 
     def loss(self, pred, label, mask=None):
         if mask is None:
