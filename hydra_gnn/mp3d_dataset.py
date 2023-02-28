@@ -56,6 +56,13 @@ class Hydra_mp3d_data:
             for room in self._G_ro.get_layer(dsg.DsgLayers.ROOMS).nodes:
                 if room_removal_func(room):
                     room.attributes.semantic_label = ord('\x15')
+    
+    def remove_room_edges_in_dsg(self):
+        """remove room layer edges in self._Gro"""
+        dsg = get_spark_dsg()
+        room_edges = [edge for edge in self._G_ro.get_layer(dsg.DsgLayers.ROOMS).edges]
+        for edge in room_edges:
+            self._G_ro.remove_edge(edge.source, edge.target)
 
     def add_object_edges(self, threshold_near=2.0, max_near=2.0, max_on=0.2):
         """add object connectivity to self._G_ro"""
