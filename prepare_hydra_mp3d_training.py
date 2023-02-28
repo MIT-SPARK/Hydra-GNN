@@ -26,6 +26,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('output_filename', default='data.pkl',
                         help="output file name")
+    parser.add_argument('--min_iou', default=0.0, type=float,
+                        help="minimum IoU threshold for room label assignment")
     parser.add_argument('--output_dir', default=os.path.join(PROJECT_DIR, 'output/preprocessed_mp3d'),
                         help="training and validation ratio")
     parser.add_argument('--expand_rooms', action='store_true',
@@ -44,6 +46,8 @@ if __name__ == "__main__":
     print("Saving torch graphs as htree:", args.save_htree)
     print("Saving torch graphs as homogeneous torch data:", args.save_homogeneous)
     print("Saving torch graphs with expand_rooms:", args.expand_rooms)
+    print("Saving torch graphs with ground-truth room repartioning:", args.repartition_rooms)
+    print("Min IoU threshold for room label assignment:", args.min_iou)
     print("Output directory:", args.output_dir) 
     print("Output data files:", f"{args.output_filename}, ({param_filename}, {skipped_filename})")
     if os.path.exists(os.path.join(args.output_dir, args.output_filename)):
@@ -95,7 +99,7 @@ if __name__ == "__main__":
 
             # parepare torch data
             data.add_dsg_room_labels(gt_house_info, angle_deg=-90, room_removal_func=room_removal_func, \
-                min_iou_threshold=0.5, repartition_rooms=args.repartition_rooms)
+                min_iou_threshold=args.min_iou, repartition_rooms=args.repartition_rooms)
             if args.repartition_rooms and data.get_room_object_dsg().get_layer(dsg.DsgLayers.OBJECTS).num_nodes() == 0:
                 skipped_json_files['no object'].append(os.path.join(trajectory_name, json_file_name))
                 continue
