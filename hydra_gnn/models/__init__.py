@@ -1,4 +1,4 @@
 from .homogeneous_network import HomogeneousNetwork
 from .heterogeneous_network import HeterogeneousNetwork
-from .neural_tree_network import HeterogeneousNeuralTreeNetwork
+from .heterogeneous_neural_tree_network import HeterogeneousNeuralTreeNetwork
 from .homogeneous_neural_tree_network import HomogeneousNeuralTreeNetwork

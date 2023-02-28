@@ -1,5 +1,5 @@
 from hydra_gnn.models.homogeneous_network import HomogeneousNetwork
-from hydra_gnn.models.neural_tree_network import LeafPool
+from hydra_gnn.models.heterogeneous_neural_tree_network import LeafPool
 import torch.nn.functional as F
 import torch_geometric.nn as pyg_nn
 
