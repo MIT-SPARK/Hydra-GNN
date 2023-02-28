@@ -189,7 +189,8 @@ def plot_histogram(data_dict, opacity=0.5):
     return fig
 
 
-def plot_room_object_heatmap(room_object_data, title='Room-object Heatmap'):
+def plot_room_object_heatmap(room_object_data, object_label_list=object_label_list, 
+                             room_label_list=room_label_list, title='Room-object Heatmap'):
     fig = go.Figure()
     fig.add_trace(
         go.Heatmap(
@@ -201,12 +202,12 @@ def plot_room_object_heatmap(room_object_data, title='Room-object Heatmap'):
             ))
     fig.update_layout(
         title=title,
-        height=len(room_label_list) * 30,
-        width=len(object_label_list) * 30 + 200,)
+        height=len(object_label_list) * 30,
+        width=len(room_label_list) * 30 + 200,)
     return fig
 
 
-def plot_room_room_heatmap(room_room_data, title='Room-Room Heatmap'):
+def plot_room_room_heatmap(room_room_data, room_label_list=room_label_list, title='Room-Room Heatmap'):
     fig = go.Figure()
     fig.add_trace(
         go.Heatmap(
@@ -225,7 +226,7 @@ def plot_room_room_heatmap(room_room_data, title='Room-Room Heatmap'):
     return fig
 
 
-def plot_object_barchart(data_dict, title='Object occurrences'):
+def plot_object_barchart(data_dict, object_label_list=object_label_list, title='Object occurrences'):
     fig = go.Figure()
     for data_name, data in data_dict.items():
         fig.add_trace(
@@ -241,7 +242,7 @@ def plot_object_barchart(data_dict, title='Object occurrences'):
     return fig
 
 
-def plot_room_barchart(data_dict, title='Room occurrences'):
+def plot_room_barchart(data_dict, room_label_list=room_label_list, title='Room occurrences'):
     fig = go.Figure()
     for data_name, data in data_dict.items():
         fig.add_trace(
