@@ -1,18 +1,20 @@
-from hydra_gnn.models import HomogeneousNetwork, HeterogeneousNetwork, NeuralTreeNetwork, HomogeneousNeuralTreeNetwork
+from hydra_gnn.models import HomogeneousNetwork, HeterogeneousNetwork, HeterogeneousNeuralTreeNetwork, HomogeneousNeuralTreeNetwork
+from hydra_gnn.mp3d_dataset import Hydra_mp3d_htree_data
 import sys
 import time
 from copy import deepcopy
 import numpy as np
 import torch
 import torch.optim as optim
+from torch_geometric.data import HeteroData
 from torch_geometric.loader import DataLoader
 from tensorboardX import SummaryWriter
 
 
 class BaseTrainingJob:
-    def __init__(self, network_type, dataset_dict, network_params, double_precision=False):
-        assert network_type in ['homogeneous', 'heterogeneous', 'neural_tree', 'homogeneous_neural_tree']
-        self._network_type = network_type
+    def __init__(self, dataset_dict, network_params, double_precision=False):
+        self._network_type = 'neural_tree' if isinstance(dataset_dict['train'].get_data(0), Hydra_mp3d_htree_data) else 'baseline'
+        self._graph_type = 'heterogeneous' if isinstance(dataset_dict['train'][0], HeteroData) else 'homogeneous'
         self._dataset_dict = dataset_dict
 
         # initialize training parameters
@@ -21,7 +23,7 @@ class BaseTrainingJob:
         
         input_dim = dataset_dict['train'].get_data(0).num_node_features()
         
-        if network_type[:11] == 'homogeneous':
+        if self._graph_type == 'homogeneous':
             self._update_training_params(network_params={'input_dim': input_dim,
                 'output_dim': dataset_dict['train'].get_data(0).num_room_labels()})
         else:
@@ -77,14 +79,19 @@ class BaseTrainingJob:
                 self._training_params['optimization_params'][key] = optimization_params[key]
 
     def initialize_network(self):
-        if self._network_type == 'homogeneous':
-            return HomogeneousNetwork(**self._training_params['network_params'])
-        elif self._network_type == 'heterogeneous':
-            return HeterogeneousNetwork(**self._training_params['network_params'])
-        elif self._network_type == 'homogeneous_neural_tree':
-            return HomogeneousNeuralTreeNetwork(**self._training_params['network_params'])
+        if self._graph_type == 'homogeneous':
+            if self._network_type == 'baseline':
+                return HomogeneousNetwork(**self._training_params['network_params'])
+            else:
+                return HomogeneousNeuralTreeNetwork(**self._training_params['network_params'])
         else:
-            return NeuralTreeNetwork(**self._training_params['network_params'])
+            if self._network_type == 'baseline':
+                return HeterogeneousNetwork(**self._training_params['network_params'])
+            else:
+                return HeterogeneousNeuralTreeNetwork(**self._training_params['network_params'])
+    
+    def train_job_type(self):
+        return f"{self._graph_type} {self._network_type}"
 
     def get_dataset(self, split_name):
         return self._dataset_dict[split_name]
@@ -143,12 +150,13 @@ class BaseTrainingJob:
                 opt.zero_grad()
 
                 pred_vec = self._net(batch.to(device))
-                if self._network_type[:11] == 'homogeneous':
+                if self._graph_type == 'homogeneous':
                     label = batch.y[batch.room_mask]
-                elif self._network_type == 'heterogeneous':
-                    label = batch['rooms'].y
                 else:
-                    label = batch['room_virtual'].y
+                    if self._network_type == 'baseline':
+                        label = batch['rooms'].y
+                    else:
+                        label = batch['room_virtual'].y
                 mask = (label != self._training_params['network_params']['ignored_label'])
                 loss = self._net.loss(pred_vec, label, mask)
                 loss.backward()
@@ -210,12 +218,13 @@ class BaseTrainingJob:
         for batch in data_loader:
             with torch.no_grad():
                 pred = self._net(batch.to(device)).argmax(dim=1)
-                if self._network_type[:11] == 'homogeneous':
+                if self._graph_type == 'homogeneous':
                     label = batch.y[batch.room_mask]
-                elif self._network_type == 'heterogeneous':
-                    label = batch['rooms'].y
                 else:
-                    label = batch['room_virtual'].y
+                    if self._network_type == 'baseline':
+                        label = batch['rooms'].y
+                    else:
+                        label = batch['room_virtual'].y
                 mask = (label != self._training_params['network_params']['ignored_label'])
 
                 pred = pred[mask]
@@ -252,12 +261,13 @@ class BaseTrainingJob:
         for data in dataset:
             with torch.no_grad():
                 pred = self._net(data.to(device)).argmax(dim=1)
-                if self._network_type[:11] == 'homogeneous':
+                if self._graph_type == 'homogeneous':
                     label = data.y[data.room_mask]
-                elif self._network_type == 'heterogeneous':
-                    label = data['rooms'].y
                 else:
-                    label = data['room_virtual'].y
+                    if self._network_type == 'baseline':
+                        label = data['rooms'].y
+                    else:
+                        label = data['room_virtual'].y
                 mask = (label != self._training_params['network_params']['ignored_label'])
 
                 pred = pred[mask]

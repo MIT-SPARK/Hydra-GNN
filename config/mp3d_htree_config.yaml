@@ -1,6 +1,6 @@
 data:
     file_path: "output/preprocessed_mp3d/htree_filter2.pkl"
-    type: "neural_tree"
+    type: "heterogeneous"
 
 run_control:
     num_runs: 5

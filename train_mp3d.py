@@ -77,7 +77,7 @@ if __name__ == "__main__":
         data_list = pickle.load(input_file)
     if config['network']['conv_block'] == 'GAT_edge':
         [data.compute_relative_pos() for data in data_list]
-    if config['data']['type'][:11] == 'homogeneous':
+    if config['data']['type'] == 'homogeneous':
         [data.to_homogeneous() for data in data_list]
     
     if args.same_val_test:
@@ -159,8 +159,7 @@ if __name__ == "__main__":
         test_time_list = []
         for j in range(config['run_control']['num_runs']):
             print(f"\nRun {j + 1} / {config['run_control']['num_runs']}:")
-            train_job = BaseTrainingJob(network_type=config['data']['type'],
-                                        dataset_dict=dataset_dict, 
+            train_job = BaseTrainingJob(dataset_dict=dataset_dict, 
                                         network_params=config['network'])
             model, best_acc, info = train_job.train(f"{experiment_output_dir_i}/{j}", 
                                             optimization_params=config['optimization'],

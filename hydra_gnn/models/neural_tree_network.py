@@ -22,9 +22,9 @@ class LeafPool(MessagePassing):
         return x_j
 
 
-class NeuralTreeNetwork(nn.Module):
+class HeterogeneousNeuralTreeNetwork(nn.Module):
     """
-    This NeuralTreeNetwork class implements message passing on augmented htrees, which includes the htree and virtual 
+    This HeterogeneousNeuralTreeNetwork class implements message passing on augmented htrees, which includes the htree and virtual 
     nodes for initialization and most message-passing pooling.
     """
     def __init__(self, input_dim_dict, output_dim=None, output_dim_dict=None, conv_block='GraphSAGE', 
@@ -44,7 +44,7 @@ class NeuralTreeNetwork(nn.Module):
         if conv_block!='GAT')
         :param dropout: float, dropout ratio during training
         """
-        super(NeuralTreeNetwork, self).__init__()
+        super(HeterogeneousNeuralTreeNetwork, self).__init__()
         assert conv_block in ['GraphSAGE', 'GAT', 'GAT_edge']
         self.conv_block = conv_block
         if output_dim is not None:
