@@ -1,4 +1,6 @@
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch_geometric.nn as pyg_nn
 from torch_geometric.nn import HeteroConv
 
@@ -74,3 +76,17 @@ def build_GAT_hetero_conv(edge_types, input_dim_dict, output_dim_dict,
             {edge_type: conv_module_list_dict[edge_type][i] for edge_type in conv_module_list_dict.keys()}, 
             aggr=aggr))
     return convs
+
+
+def cross_entropy_loss(pred, label, mask=None):
+    if isinstance(pred, torch.Tensor):
+        if mask is None:
+            return F.cross_entropy(pred, label)
+        else:
+            return F.cross_entropy(pred[mask, :], label[mask])
+    else:
+        num_preds = len(pred)
+        if mask is None:
+            return sum(F.cross_entropy(pred[i], label[i]) for i in range(num_preds))
+        else:
+            return sum(F.cross_entropy(pred[i][mask[i], :], label[i][mask[i]]) for i in range(num_preds))

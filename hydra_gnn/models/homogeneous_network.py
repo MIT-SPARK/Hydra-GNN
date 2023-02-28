@@ -1,8 +1,8 @@
+from hydra_gnn.models.utils import build_conv_layer, build_GAT_conv_layers, cross_entropy_loss
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn.norm.batch_norm import BatchNorm
-from hydra_gnn.models.utils import build_conv_layer, build_GAT_conv_layers
 
 
 class HomogeneousNetwork(nn.Module):
@@ -63,7 +63,4 @@ class HomogeneousNetwork(nn.Module):
         return x[room_mask, :]
 
     def loss(self, pred, label, mask=None):
-        if mask is None:
-            return F.cross_entropy(pred, label)
-        else:
-            return F.cross_entropy(pred[mask, :], label[mask])
+        return cross_entropy_loss(pred, label, mask)

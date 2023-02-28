@@ -1,4 +1,4 @@
-from hydra_gnn.models.utils import build_hetero_conv, build_GAT_hetero_conv
+from hydra_gnn.models.utils import build_hetero_conv, build_GAT_hetero_conv, cross_entropy_loss
 from neural_tree.construct import HTREE_NODE_TYPES, HTREE_EDGE_TYPES, HTREE_INIT_EDGE_TYPES
 import torch
 import torch.nn as nn
@@ -126,7 +126,4 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
         
 
     def loss(self, pred, label, mask=None):
-        if mask is None:
-            return F.cross_entropy(pred, label)
-        else:
-            return F.cross_entropy(pred[mask, :], label[mask])
+        return cross_entropy_loss(pred, label, mask)
