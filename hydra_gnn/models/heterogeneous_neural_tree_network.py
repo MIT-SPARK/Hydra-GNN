@@ -27,7 +27,7 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
     This HeterogeneousNeuralTreeNetwork class implements message passing on augmented htrees, which includes the htree and virtual 
     nodes for initialization and most message-passing pooling.
     """
-    def __init__(self, input_dim_dict, output_dim=None, output_dim_dict=None, conv_block='GraphSAGE', 
+    def __init__(self, input_dim_dict, output_dim=None, output_dim_dict=None, conv_block='GraphSAGE',
                  hidden_dim=None, num_layers=None, GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
         """
         :param input_dim_dict: dictionary of node type to input feature dimension mapping
@@ -50,7 +50,7 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
         if output_dim is not None:
             assert output_dim_dict is None
             self.classification_task = 'room'
-            output_dim_dict = output_dim_dict = {node_type: output_dim for node_type in HTREE_NODE_TYPES}
+            output_dim_dict = {node_type: output_dim for node_type in HTREE_NODE_TYPES}
         else:
             assert output_dim_dict is not None
             self.classification_task = 'all'
@@ -123,7 +123,6 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
             x_object = self.post_mp(x_dict['object'], edge_index_dict['object', 'o_to_ov', 'object_virtual'])\
                 [0: data['object_virtual'].num_nodes]
             return x_room, x_object
-        
 
     def loss(self, pred, label, mask=None):
         return cross_entropy_loss(pred, label, mask)

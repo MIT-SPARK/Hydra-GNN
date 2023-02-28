@@ -135,6 +135,7 @@ class Hydra_mp3d_data:
                 self._torch_data[node_type].x = torch.nn.functional.pad(self._torch_data[node_type].x, \
                     (0, num_node_features - self._torch_data[node_type].x.shape[1], 0, 0), mode='constant', value=0)
             self._torch_data = self._torch_data.to_homogeneous(add_edge_type=False)
+            self._torch_data.object_mask = (self._torch_data.node_type == 0)
             self._torch_data.room_mask = (self._torch_data.node_type == 1)
     
     def num_node_features(self):
