@@ -14,6 +14,66 @@ EDGE_TYPES = [('objects', 'objects_to_objects', 'objects'),
               ('rooms', 'rooms_to_objects', 'objects')]
 
 
+def heterogeneous_data_to_homogeneous(torch_data: HeteroData):
+    """
+    Helper function to convert a pyg data from HeteroData to (homogeneous) Data. 
+    The number of node features will be the maximum num of node features across all node types.
+    """
+    num_node_features = max([torch_data[node_type].num_node_features \
+        for node_type in torch_data.x_dict])
+    for node_type in torch_data.x_dict:
+        if torch_data[node_type].num_nodes == 0:
+            torch_data[node_type].x = torch.empty((0, num_node_features), dtype=torch_data[node_type].x.dtype)
+            continue
+        torch_data[node_type].x = torch.nn.functional.pad(torch_data[node_type].x, \
+            (0, num_node_features - torch_data[node_type].x.shape[1], 0, 0), mode='constant', value=0)
+    node_types = list(torch_data.x_dict.keys())
+    torch_data = torch_data.to_homogeneous(add_edge_type=False)
+    return torch_data, node_types
+
+
+def heterogeneous_htree_to_homogeneous(torch_data: HeteroData):
+    """
+    Helper function to convert an augmented htree from HeteroData to (homogeneous) Data. 
+    The number of node features will be the maximum num of node features across all node types.
+    """
+    assert 'object_virtual' in torch_data.x_dict.keys()
+    assert 'room_virtual' in torch_data.x_dict.keys()
+
+    # add redundant y labels so that y is saved after HeteroData.to_homogeneous()
+    if 'y' in torch_data['room_virtual']:
+        y_dtype = torch_data['room_virtual'].y.dtype
+        for node_type in torch_data.x_dict:
+            if 'y' not in torch_data[node_type]:
+                torch_data[node_type].y = -torch.ones(torch_data[node_type].num_nodes, dtype=y_dtype)
+    
+    # convert torch_data to homogeneous using parent class method
+    torch_data, node_types = heterogeneous_data_to_homogeneous(torch_data)
+    object_virutal_idx = node_types.index('object_virtual')
+    room_virutal_idx = node_types.index('room_virtual')
+
+    # find initialization edges from virtual nodes to htree (clique) nodes
+    source_node_type = torch_data.node_type[torch_data.edge_index[0]]
+    init_edge_mask = (source_node_type == object_virutal_idx) | (source_node_type == room_virutal_idx)
+    # find pool edges from htree (leaf) nodes to virtual nodes
+    target_node_type = torch_data.node_type[torch_data.edge_index[1]]
+    pool_edge_mask = (target_node_type == object_virutal_idx) | (target_node_type == room_virutal_idx)
+
+    # update edge indices
+    torch_data.init_edge_index = torch_data.edge_index[:, init_edge_mask]
+    torch_data.pool_edge_index = torch_data.edge_index[:, pool_edge_mask]
+    htree_edge_mask = ~(init_edge_mask | pool_edge_mask)
+    torch_data.edge_index = torch_data.edge_index[:, htree_edge_mask]
+    assert is_undirected(torch_data.edge_index)
+    if 'edge_attr' in torch_data:
+        torch_data.edge_attr = torch_data.edge_attr[htree_edge_mask, :]
+
+    # set room_mask to show the original virtual nodes -- these are the classification nodes
+    torch_data.room_mask = (torch_data.node_type == room_virutal_idx)
+    torch_data.object_mask = (torch_data.node_type == object_virutal_idx)
+    return torch_data
+
+
 class Hydra_mp3d_data:
     """
     data class that takes in a hydra-mp3d trajectory, converts and stores torch data for training.
