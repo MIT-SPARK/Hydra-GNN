@@ -186,18 +186,15 @@ class Hydra_mp3d_data:
         
     def to_homogeneous(self):
         if isinstance(self._torch_data, HeteroData):
-            num_node_features = max([self._torch_data[node_type].num_node_features \
-                for node_type in self._torch_data.x_dict])
-            for node_type in self._torch_data.x_dict:
-                if self._torch_data[node_type].num_nodes == 0:
-                    self._torch_data[node_type].x = torch.empty((0, num_node_features), dtype=self._torch_data[node_type].x.dtype)
-                    continue
-                self._torch_data[node_type].x = torch.nn.functional.pad(self._torch_data[node_type].x, \
-                    (0, num_node_features - self._torch_data[node_type].x.shape[1], 0, 0), mode='constant', value=0)
-            self._torch_data = self._torch_data.to_homogeneous(add_edge_type=False)
-            self._torch_data.object_mask = (self._torch_data.node_type == 0)
-            self._torch_data.room_mask = (self._torch_data.node_type == 1)
+            self._torch_data, node_types = heterogeneous_data_to_homogeneous(self._torch_data)
+            self._torch_data.room_mask = (self._torch_data.node_type == node_types.index('rooms'))
     
+    def num_graph_nodes(self):
+        if self.is_heterogeneous():
+            return self._torch_data['rooms'].num_nodes + self._torch_data['objects'].num_nodes
+        else:
+            return self._torch_data.num_nodes
+
     def num_node_features(self):
         if self._torch_data is None:
             return None
@@ -252,9 +249,6 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         room_synonyms=[('a', 't'), ('z', 'Z', 'x', 'p', '\x15')], double_precision=False,
         remove_room_semantic_feature=True, remove_clique_semantic_feature=True):
         """compute self._torch data by converting self._G_ro to htree in torch data format"""
-        if not use_heterogeneous:
-            raise NotImplemented
-
         # convert room-object dsg to torch dsg using parent class method
         Hydra_mp3d_data.compute_torch_data(self, use_heterogeneous=True, node_converter=node_converter, \
             object_synonyms=object_synonyms, room_synonyms=room_synonyms, double_precision=double_precision)
@@ -280,6 +274,15 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
         self._torch_data['object_virtual'].y = torch.tensor(object_y)
         self._torch_data['room_virtual'].y = torch.tensor(room_y)
+
+        if not use_heterogeneous:
+            self.to_homogeneous()
+    
+    def num_graph_nodes(self):
+        if self.is_heterogeneous():
+            return self._torch_data['room_virtual'].num_nodes + self._torch_data['object_virtual'].num_nodes
+        else:
+            return self._torch_data.room_mask.sum().item() + self._torch_data.object_mask.sum().item()
     
     def get_diameters(self, valid_room_labels=None, with_room_ids=False):
         assert isinstance(self._torch_data, HeteroData)
@@ -319,41 +322,9 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
     def to_homogeneous(self):
         if isinstance(self._torch_data, HeteroData):
-            # log object_virtual and room_virtual node type index
-            object_virutal_idx = list(self._torch_data.x_dict.keys()).index('object_virtual')
-            room_virutal_idx = list(self._torch_data.x_dict.keys()).index('room_virtual')
-            
-            # add redundant y labels so that y is saved after HeteroData.to_homogeneous()
-            if 'y' in self._torch_data['room_virtual']:
-                y_dtype = self._torch_data['room_virtual'].y.dtype
-                for node_type in self._torch_data.x_dict:
-                    if 'y' not in self._torch_data[node_type]:
-                        self._torch_data[node_type].y = \
-                            -torch.ones(self._torch_data[node_type].num_nodes, dtype=y_dtype)
-            
-            # convert torch_data to homogeneous using parent class method
-            Hydra_mp3d_data.to_homogeneous(self)
+            self._torch_data = heterogeneous_htree_to_homogeneous(self._torch_data)
 
-            # find initialization edges from virtual nodes to htree (clique) nodes
-            source_node_type = self._torch_data.node_type[self._torch_data.edge_index[0]]
-            init_edge_mask = (source_node_type == object_virutal_idx) | (source_node_type == room_virutal_idx)
-            # find pool edges from htree (leaf) nodes to virtual nodes
-            target_node_type = self._torch_data.node_type[self._torch_data.edge_index[1]]
-            pool_edge_mask = (target_node_type == object_virutal_idx) | (target_node_type == room_virutal_idx)
 
-            # update edge indices
-            self._torch_data.init_edge_index = self._torch_data.edge_index[:, init_edge_mask]
-            self._torch_data.pool_edge_index = self._torch_data.edge_index[:, pool_edge_mask]
-            htree_edge_mask = ~(init_edge_mask | pool_edge_mask)
-            self._torch_data.edge_index = self._torch_data.edge_index[:, htree_edge_mask]
-            assert is_undirected(self._torch_data.edge_index)
-            if 'edge_attr' in self._torch_data:
-                self._torch_data.edge_attr = self._torch_data.edge_attr[htree_edge_mask, :]
-
-            # set room_mask to show the original room_virtual nodes -- these are the classification nodes
-            self._torch_data.room_mask = (self._torch_data.node_type == room_virutal_idx)
-
-    
 class Hydra_mp3d_dataset(torch.utils.data.Dataset):
     def __init__(self, split):
         assert split in ('train', 'val', 'test'), "Invalid data split."
