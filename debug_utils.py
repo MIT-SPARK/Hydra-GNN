@@ -1,6 +1,6 @@
 from hydra_gnn.utils import PROJECT_DIR, HYDRA_TRAJ_DIR, MP3D_HOUSE_DIR, COLORMAP_DATA_PATH, WORD2VEC_MODEL_PATH, MP3D_OBJECT_LABEL_DATA_PATH
-from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data, Hydra_mp3d_dataset
-from hydra_gnn.preprocess_dsgs import hydra_object_feature_converter, hydra_node_converter, OBJECT_LABELS, ROOM_LABELS, _get_label_dict
+from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data
+from hydra_gnn.preprocess_dsgs import hydra_object_feature_converter, dsg_node_converter, OBJECT_LABELS, ROOM_LABELS, _get_label_dict
 from spark_dsg.mp3d import load_mp3d_info
 import spark_dsg as dsg
 import torch_geometric.utils as pyg_utils
@@ -94,7 +94,7 @@ def generate_mp3d_datalist(expand_rooms=False, save_htree=False):
             data.add_object_edges(threshold_near=threshold_near, max_near=max_near, max_on=max_on)
             data.compute_torch_data(
                 use_heterogeneous=True,
-                node_converter=hydra_node_converter(object_feature_converter, room_feature_converter),
+                node_converter=dsg_node_converter(object_feature_converter, room_feature_converter),
                 object_synonyms=object_synonyms, 
                 room_synonyms=room_synonyms)
             data.clear_dsg()    # remove hydra dsg for output

@@ -1,4 +1,4 @@
-from hydra_gnn.preprocess_dsgs import get_room_object_dsg, add_object_connectivity, hydra_node_converter, \
+from hydra_gnn.preprocess_dsgs import get_room_object_dsg, add_object_connectivity, dsg_node_converter, \
     hydra_object_feature_converter, convert_label_to_y, OBJECT_LABELS, ROOM_LABELS
 from spark_dsg.mp3d import load_mp3d_info, add_gt_room_label
 import spark_dsg as dsg
@@ -85,12 +85,12 @@ def test_full_torch_feature_conversion(test_data_dir, tol=tol):
 
     # setup 1: no semantic feature
     data_1 = G_ro.to_torch(use_heterogeneous=True, 
-                        node_converter=hydra_node_converter(
+                        node_converter=dsg_node_converter(
                             object_feature_converter=lambda i: np.empty(0),
                             room_feature_converter=lambda i: np.empty(0)))
 
     data_2 = G_ro.to_torch(use_heterogeneous=False, 
-                        node_converter=hydra_node_converter(
+                        node_converter=dsg_node_converter(
                             object_feature_converter=lambda i: np.empty(0),
                             room_feature_converter=lambda i: np.empty(0)))
 
@@ -114,13 +114,13 @@ def test_full_torch_feature_conversion(test_data_dir, tol=tol):
         word2vec_model = pytest.word2vec_model
 
     data_3 = G_ro.to_torch(use_heterogeneous=True,
-                           node_converter=hydra_node_converter(
+                           node_converter=dsg_node_converter(
                                object_feature_converter=hydra_object_feature_converter(
                                    colormap_data, word2vec_model),
                                room_feature_converter=lambda i: np.empty(0)))
 
     data_4 = G_ro.to_torch(use_heterogeneous=False,
-                           node_converter=hydra_node_converter(
+                           node_converter=dsg_node_converter(
                                object_feature_converter=hydra_object_feature_converter(
                                    colormap_data, word2vec_model),
                                room_feature_converter=lambda i: np.empty(300)))
@@ -192,7 +192,7 @@ def test_convert_label_to_y(test_data_dir):
 
     # setup 1: convert room-object graph to homogeneous torch data
     data_homogeneous = G_ro.to_torch(use_heterogeneous=False,
-                                     node_converter=hydra_node_converter(
+                                     node_converter=dsg_node_converter(
                                          object_feature_converter=hydra_object_feature_converter(
                                              colormap_data, word2vec_model),
                                          room_feature_converter=lambda i: np.empty(300)))
@@ -209,7 +209,7 @@ def test_convert_label_to_y(test_data_dir):
 
     # setup 2: convert room-object graph to heterogeneous torch data
     data_heterogeneous = G_ro.to_torch(use_heterogeneous=True,
-                                       node_converter=hydra_node_converter(
+                                       node_converter=dsg_node_converter(
                                            object_feature_converter=hydra_object_feature_converter(
                                                colormap_data, word2vec_model),
                                            room_feature_converter=lambda i: np.empty(0)))

@@ -1,4 +1,4 @@
-from hydra_gnn.preprocess_dsgs import hydra_node_converter, hydra_object_feature_converter, \
+from hydra_gnn.preprocess_dsgs import dsg_node_converter, hydra_object_feature_converter, \
     OBJECT_LABELS, ROOM_LABELS
 from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_dataset, EDGE_TYPES
 from spark_dsg.mp3d import load_mp3d_info
@@ -57,7 +57,7 @@ def test_Hydra_mp3d_data(test_data_dir):
 
     # setup 1: convert room-object graph to homogeneous torch data
     data.compute_torch_data(use_heterogeneous=False,
-        node_converter=hydra_node_converter(object_feature_converter, lambda i: np.empty(300)),
+        node_converter=dsg_node_converter(object_feature_converter, lambda i: np.empty(300)),
         object_synonyms=object_synonyms, room_synonyms=room_synonyms)
     torch_data = data.get_torch_data()
     # check y is computed
@@ -79,7 +79,7 @@ def test_Hydra_mp3d_data(test_data_dir):
 
     # setup 2: convert room-object graph to heterogeneous torch data
     data.compute_torch_data(use_heterogeneous=True,
-        node_converter=hydra_node_converter(object_feature_converter, lambda i: np.empty(0)),
+        node_converter=dsg_node_converter(object_feature_converter, lambda i: np.empty(0)),
         object_synonyms=object_synonyms, room_synonyms=room_synonyms)
     torch_data = data.get_torch_data()
     # check y is computed
@@ -194,12 +194,12 @@ def test_Hydra_mp3d_dataset(test_data_dir):
         data1.add_dsg_room_labels(gt_house_info1, angle_deg=-90)
         data1.add_object_edges(threshold_near=2.0, threshold_on=1.0, max_near=2.0)
         data1.compute_torch_data(use_heterogeneous=True,
-            node_converter=hydra_node_converter(object_feature_converter, lambda i: np.empty(300)))
+            node_converter=dsg_node_converter(object_feature_converter, lambda i: np.empty(300)))
         gt_house_info2 = load_mp3d_info(gt_house_file2)
         data2.add_dsg_room_labels(gt_house_info2, angle_deg=-90)
         data2.add_object_edges(threshold_near=2.0, threshold_on=1.0, max_near=2.0)
         data2.compute_torch_data(use_heterogeneous=True,
-            node_converter=hydra_node_converter(object_feature_converter, lambda i: np.empty(300)))
+            node_converter=dsg_node_converter(object_feature_converter, lambda i: np.empty(300)))
         dataset.add_data(data1)
         dataset.add_data(data2)
         assert dataset.split == 'train'

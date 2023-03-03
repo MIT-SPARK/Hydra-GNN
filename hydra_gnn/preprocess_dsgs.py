@@ -346,7 +346,7 @@ def hydra_object_feature_converter(hydra_colormap_data, word2vec_model):
         [word2vec_model[s] for s in hydra_colormap_data['name'][i].split("_") if s != "of"], axis=0,)
 
 
-def hydra_node_converter(object_feature_converter, room_feature_converter=lambda i:np.zeros(300)):
+def dsg_node_converter(object_feature_converter, room_feature_converter=lambda i:np.zeros(300)):
     """
     Returns a function that computes the node feature vector x for Hydra dsg to torch data conversion.
     Here x is consists of 3d position, 3d (axis-aligned) bounding box size, 

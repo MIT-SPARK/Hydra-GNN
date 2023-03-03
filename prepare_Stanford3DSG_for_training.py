@@ -1,7 +1,7 @@
 from hydra_gnn.utils import PROJECT_DIR, WORD2VEC_MODEL_PATH, STANFORD3DSG_DATA_DIR
 from hydra_gnn.Stanford3DSG_dataset import Stanford3DSG_data, Stanford3DSG_htree_data, \
     Stanford3DSG_object_feature_converter, Stanford3DSG_room_feature_converter
-from hydra_gnn.preprocess_dsgs import hydra_node_converter
+from hydra_gnn.preprocess_dsgs import dsg_node_converter
 import os
 import argparse
 import numpy as np
@@ -63,7 +63,7 @@ if __name__ == "__main__":
         data.add_object_edges(threshold_near=threshold_near, max_near=max_near, max_on=max_on)
         data.compute_torch_data(
             use_heterogeneous=(not args.save_homogeneous),
-            node_converter=hydra_node_converter(object_feature_converter, room_feature_converter))
+            node_converter=dsg_node_converter(object_feature_converter, room_feature_converter))
         data.clear_dsg()    # remove hydra dsg for output
         data_list.append(data)
         

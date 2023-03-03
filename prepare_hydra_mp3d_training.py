@@ -1,6 +1,6 @@
 from hydra_gnn.utils import PROJECT_DIR, HYDRA_TRAJ_DIR, MP3D_HOUSE_DIR, COLORMAP_DATA_PATH, WORD2VEC_MODEL_PATH
 from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data
-from hydra_gnn.preprocess_dsgs import hydra_object_feature_converter, hydra_node_converter
+from hydra_gnn.preprocess_dsgs import hydra_object_feature_converter, dsg_node_converter
 from spark_dsg.mp3d import load_mp3d_info
 import spark_dsg as dsg
 import os
@@ -106,7 +106,7 @@ if __name__ == "__main__":
             data.add_object_edges(threshold_near=threshold_near, max_near=max_near, max_on=max_on)
             data.compute_torch_data(
                 use_heterogeneous=(not args.save_homogeneous),
-                node_converter=hydra_node_converter(object_feature_converter, room_feature_converter),
+                node_converter=dsg_node_converter(object_feature_converter, room_feature_converter),
                 object_synonyms=object_synonyms, 
                 room_synonyms=room_synonyms)
             data.clear_dsg()    # remove hydra dsg for output
