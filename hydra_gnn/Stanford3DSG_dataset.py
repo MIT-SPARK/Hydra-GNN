@@ -129,14 +129,14 @@ class Stanford3DSG_data(Hydra_mp3d_data):
             self.fill_missing_edge_index(self._torch_data, EDGE_TYPES)
             # training label y is the same as label
             for node_type in self._torch_data.x_dict:
-                self._torch_data[node_type].y = self._torch_data[node_type].label
+                self._torch_data[node_type].y = self._torch_data[node_type].label.long()
                 # delattr(self._torch_data[node_type], 'label')
             assert self._torch_data['rooms'].num_node_features == self._torch_data['objects'].num_node_features
         else:
             self._torch_data.room_mask = self._torch_data['node_masks'][4]
             delattr(self._torch_data, 'node_masks')
             # training label y is the same as label
-            self._torch_data.y = self._torch_data.label
+            self._torch_data.y = self._torch_data.label.long()
             # delattr(self._torch_data, 'label')
     
     def num_room_labels(self):
@@ -182,8 +182,8 @@ class Stanford3DSG_htree_data(Stanford3DSG_data):
         self._torch_data = nx_htree_to_torch(htree_aug_nx, double_precision=double_precision)
 
         # copy label attributes to y
-        self._torch_data['object_virtual'].y = self._torch_data['object_virtual'].label
-        self._torch_data['room_virtual'].y = self._torch_data['room_virtual'].label
+        self._torch_data['object_virtual'].y = self._torch_data['object_virtual'].label.long()
+        self._torch_data['room_virtual'].y = self._torch_data['room_virtual'].label.long()
         
         if not use_heterogeneous:
             self.to_homogeneous()
