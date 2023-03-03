@@ -139,6 +139,16 @@ class Stanford3DSG_data(Hydra_mp3d_data):
             self._torch_data.y = self._torch_data.label
             # delattr(self._torch_data, 'label')
     
+    def num_room_labels(self):
+        return max(self._room_semantic_dict.values()) + 1
+
+    def num_object_labels(self):
+        return max(self._object_semantic_dict.values()) + 1
+    
+    def get_label_dict(self):
+        return {'objects': self._object_semantic_dict,
+                'rooms': self._room_semantic_dict}
+    
     def get_data_info(self):
         return {'scene_id': self._scene_id,
                 'scene_name': self._scene_name,
