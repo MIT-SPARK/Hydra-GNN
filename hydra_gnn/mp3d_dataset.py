@@ -212,7 +212,7 @@ class Hydra_mp3d_data:
 
     def is_heterogeneous(self):
         if self._torch_data is None:
-            return None
+            raise RuntimeError("PyG data not found. Need to run compute_torch_data() first.")
         else:
             return isinstance(self._torch_data, HeteroData)
 
@@ -339,6 +339,18 @@ class Hydra_mp3d_dataset(torch.utils.data.Dataset):
 
     def get_data(self, item):
         return self._data_list[item]
+
+    def data_type(self):
+        if isinstance(self._data_list[0], Hydra_mp3d_htree_data):
+            if self._data_list[0].is_heterogeneous():
+                return 'heterogeneous_htree'
+            else:
+                return 'homogeneous_htree'
+        else:
+            if self._data_list[0].is_heterogeneous():
+                return 'heterogeneous'
+            else:
+                return 'homogeneous'
 
     def num_scenes(self):
         return len(set([data.get_data_info()['scene_id'] \

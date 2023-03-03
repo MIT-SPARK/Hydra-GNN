@@ -6,15 +6,16 @@ from copy import deepcopy
 import numpy as np
 import torch
 import torch.optim as optim
-from torch_geometric.data import HeteroData
 from torch_geometric.loader import DataLoader
 from tensorboardX import SummaryWriter
 
 
 class BaseTrainingJob:
     def __init__(self, dataset_dict, network_params, double_precision=False):
-        self._network_type = 'neural_tree' if isinstance(dataset_dict['train'].get_data(0), Hydra_mp3d_htree_data) else 'baseline'
-        self._graph_type = 'heterogeneous' if isinstance(dataset_dict['train'][0], HeteroData) else 'homogeneous'
+        # data_type: (1)homogeneous (2)heterogeneous (3)homogeneous_htree (4)heterogeneous_htree
+        data_type = dataset_dict['train'].data_type().split('_')
+        self._network_type = 'neural_tree' if len(data_type) == 2 else 'baseline'
+        self._graph_type = data_type[0]
         self._dataset_dict = dataset_dict
 
         # initialize training parameters
