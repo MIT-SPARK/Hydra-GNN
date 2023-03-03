@@ -121,8 +121,8 @@ class Stanford3DSG_data(Hydra_mp3d_data):
     def compute_torch_data(self, use_heterogeneous: bool, node_converter, double_precision=False):
         """compute self._torch data by converting self._G_ro to torch data"""
         # convert room-object dsg to torch graph
-        # todo: add node_converter
         self._torch_data = self._G_ro.to_torch(use_heterogeneous=use_heterogeneous,
+                                               node_converter=node_converter,
                                                double_precision=double_precision)
         
         if use_heterogeneous:   # for HeteroData, make sure all edges are there
@@ -171,8 +171,10 @@ class Stanford3DSG_htree_data(Stanford3DSG_data):
         # update self._torch_data by coverting networkx htree to torch data
         self._torch_data = nx_htree_to_torch(htree_aug_nx, double_precision=double_precision)
 
-        # todo: check y label
-
+        # copy label attributes to y
+        self._torch_data['object_virtual'].y = self._torch_data['object_virtual'].label
+        self._torch_data['room_virtual'].y = self._torch_data['room_virtual'].label
+        
         if not use_heterogeneous:
             self.to_homogeneous()
     
