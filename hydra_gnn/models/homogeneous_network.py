@@ -9,7 +9,7 @@ class HomogeneousNetwork(nn.Module):
     """
     This HomogeneousNetwork class implements message passing on homogeneous room-object graphs.
     """
-    def __init__(self, input_dim, output_dim, output_dim_dict=None, conv_block='GCN', 
+    def __init__(self, input_dim, output_dim=None, output_dim_dict=None, conv_block='GCN', 
                  hidden_dim=None, num_layers=None, GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
         """
         :param input_dim: int, input feature dimension

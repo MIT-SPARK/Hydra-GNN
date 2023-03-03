@@ -9,7 +9,7 @@ class HomogeneousNeuralTreeNetwork(HomogeneousNetwork):
     This HomogeneousNeuralTreeNetwork class implements pre-message passing initialization (of clique nodes) using virtual nodes,
     homogeneous message passing on htrees, and post message passing pooling from leaf nodes to virtual nodes.
     """
-    def __init__(self, input_dim, output_dim, output_dim_dict=None, conv_block='GCN', 
+    def __init__(self, input_dim, output_dim=None, output_dim_dict=None, conv_block='GCN', 
                  hidden_dim=None, num_layers=None, GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
         """
         :param input_dim: int, input feature dimension
