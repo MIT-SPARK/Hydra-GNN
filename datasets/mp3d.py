@@ -20,10 +20,10 @@ from hydra_gnn.preprocess_dsgs import convert_label_to_y, add_object_connectivit
 BASE_DIR = '../'
 
 
-def extract_object_graph(graph_torch, tonx=True):
+def extract_object_graph(graph_torch, to_nx=True):
     if not graph_torch['objects']:
         object_graph = Data()
-        if tonx:
+        if to_nx:
             object_graph = nx.empty_graph()
 
     else:
@@ -39,20 +39,18 @@ def extract_object_graph(graph_torch, tonx=True):
                                 edge_index=torch.zeros(2, 0).to(dtype=torch.long))
             print("This graph has no object_to_object edges.")
 
-        if tonx:
+        if to_nx:
             object_graph = to_networkx(object_graph, to_undirected=True)
-            # nx.draw(object_graph)
-            # plt.show()
 
     return object_graph
 
 
-def extract_room_graph(graph_torch, tonx=True):
+def extract_room_graph(graph_torch, to_nx=True):
 
     # breakpoint()
     if not graph_torch['rooms']:
         room_graph = Data()
-        if tonx:
+        if to_nx:
             room_graph = nx.empty_graph()
 
     else:
@@ -67,7 +65,7 @@ def extract_room_graph(graph_torch, tonx=True):
                               y=graph_torch['rooms'].label,
                               edge_index=torch.zeros(2, 0).to(dtype=torch.long))
 
-        if tonx:
+        if to_nx:
             room_graph = to_networkx(room_graph, to_undirected=True)
 
     return room_graph

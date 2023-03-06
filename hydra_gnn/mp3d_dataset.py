@@ -126,6 +126,8 @@ class Hydra_mp3d_data:
 
     def add_object_edges(self, threshold_near=2.0, max_near=2.0, max_on=0.2):
         """add object connectivity to self._G_ro"""
+        dsg = get_spark_dsg()
+        assert self._G_ro.get_layer(dsg.DsgLayers.OBJECTS).num_edges != 0, "Object edges already computed."
         add_object_connectivity(self._G_ro, threshold_near=threshold_near, max_near=max_near,
             max_on=max_on)
 

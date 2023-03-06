@@ -33,7 +33,7 @@ def analyze_objects(dset, save_file='./data/objects_analysis_all.pkl'):
 
         # graph = data['dsg']
         graph_torch = data['dsg_torch']
-        object_graph = extract_object_graph(graph_torch, tonx=True)
+        object_graph = extract_object_graph(graph_torch, to_nx=True)
 
         nodes_ = object_graph.number_of_nodes()
         edges_ = object_graph.number_of_edges()

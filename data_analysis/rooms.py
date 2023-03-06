@@ -33,7 +33,7 @@ def analyze_rooms(dset, save_file='./data/room_analysis_all.pkl'):
 
         # graph = data['dsg']
         graph_torch = data['dsg_torch']
-        room_graph = extract_room_graph(graph_torch, tonx=True)
+        room_graph = extract_room_graph(graph_torch, to_nx=True)
 
         nodes_ = room_graph.number_of_nodes()
         edges_ = room_graph.number_of_edges()
@@ -89,7 +89,7 @@ def see_nontree_rooms(dset, save_dir='./data'):
 
         # graph = data['dsg']
         graph_torch = data['dsg_torch']
-        room_graph = extract_room_graph(graph_torch, tonx=True)
+        room_graph = extract_room_graph(graph_torch, to_nx=True)
 
         nodes_ = room_graph.number_of_nodes()
         if nodes_:
