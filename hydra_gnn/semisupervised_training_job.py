@@ -1,7 +1,4 @@
 from hydra_gnn.base_training_job import BaseTrainingJob
-from hydra_gnn.Stanford3DSG_dataset import Stanford3DSG_htree_data
-from hydra_gnn.models import HomogeneousNetwork, HeterogeneousNetwork, HeterogeneousNeuralTreeNetwork, HomogeneousNeuralTreeNetwork
-import sys
 import time
 from copy import deepcopy
 import numpy as np
@@ -159,13 +156,20 @@ class SemiSupervisedTrainingJob(BaseTrainingJob):
 
         return self._net, (max_val_acc, test_result), info
 
-    def test(self, data_loader, mask_name, get_type_separated_accuracy=False):
+    def test(self, data_loader=None, mask_name='test_mask', get_type_separated_accuracy=False):
         assert mask_name in ['train_mask', 'val_mask', 'test_mask']
+        if data_loader is None:
+            data_loader = DataLoader(self._dataset, 
+                                     batch_size=self._training_params['optimization_params']['batch_size'],
+                                     shuffle=self._training_params['optimization_params']['shuffle'])
+
         self._net.eval()
         device = next(self._net.parameters()).device
 
-        correct = 0
-        total = 0
+        correct_room = 0
+        correct_object = 0
+        total_room = 0
+        total_object = 0
         for batch in data_loader:
             with torch.no_grad():
                 pred = self._net(batch.to(device))
@@ -184,12 +188,18 @@ class SemiSupervisedTrainingJob(BaseTrainingJob):
                     else:
                         label = batch['room_virtual'].y, batch['object_virtual'].y
                         mask = batch['room_virtual'][mask_name], batch['object_virtual'][mask_name]
+            batch_correct_room, batch_correct_object = (p[m].eq(l[m]).sum().item() for p, l, m in zip(pred, label, mask))
+            batch_totoal_room, batch_total_object = (torch.numel(l[m]) for l, m in zip(label, mask))
+            
+            correct_room += batch_correct_room
+            correct_object += batch_correct_object
+            total_room += batch_totoal_room
+            total_object += batch_total_object
 
-            correct += sum(p[m].eq(l[m]).sum().item() for p, l, m in zip(pred, label, mask))
-            total += sum(torch.numel(l[m]) for l, m in zip(label, mask))
-
-        # todo: get_type_separated_accuracy
-        return correct / total
+        if get_type_separated_accuracy:
+            return correct_room / total_room, correct_object / total_object
+        else:
+            return (correct_room + correct_object) / (total_room + total_object)
 
     def test_individual_graph(self, dataset, model=None):
         return NotImplemented
