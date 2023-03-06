@@ -1,11 +1,17 @@
+from neural_tree.construct import HTREE_NODE_TYPES, HTREE_EDGE_TYPES
+from datasets.mp3d import extract_object_graph, extract_room_graph
+import numpy as np
+import torch_geometric
+from torch_geometric.utils import to_networkx
+from torch_geometric.data import HeteroData
+import networkx as nx
+from networkx.algorithms.approximation.treewidth import treewidth_min_degree, treewidth_min_fill_in
 import plotly.graph_objects as go
 import plotly.express as px
-import torch_geometric
 import os.path
 from typing import Any, Sequence, Iterator
 from io import IOBase
 import itertools
-import numpy as np
 
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -28,6 +34,74 @@ def update_existing_keys(dict_to_update, dict_input):
     dict_to_update.update({k:v for k, v in dict_input.items() if k in dict_to_update.keys()})
 
 
+# -----------------------------------------------------------------------------
+# Data analysis: graph treewidth, htree diameter
+# -----------------------------------------------------------------------------
+def get_treewidth(torch_data, graph_type='full'):
+    """
+    Find treewidth upper bound of the full input PyG graph, or the object subgraphs, or the room subgraph,
+    using approximate algorithms.
+    """
+    assert graph_type in ['full', 'object', 'room']
+    if graph_type == 'full':
+        nx_graph = to_networkx(torch_data.to_homogeneous()) if isinstance(torch_data, HeteroData) \
+            else to_networkx(torch_data)
+    elif graph_type == 'object':
+        nx_graph = extract_object_graph(torch_data, to_nx=True)
+    else:
+        nx_graph = extract_room_graph(torch_data, to_nx=True)
+
+    num_nodes = nx_graph.number_of_nodes()
+    num_edges = nx_graph.number_of_edges()
+    if num_nodes:
+        if num_edges:
+            tw1, _ = treewidth_min_degree(nx_graph)
+            tw2, _ = treewidth_min_fill_in(nx_graph)
+            return max([tw1, tw2])
+        else:
+            return 0
+    else:
+        return 0
+
+def get_diameters(torch_data, valid_room_labels=None):
+    """
+    Get diameter of an augmented htree by first creating a copy of the htree without the virtual nodes.
+    """
+    assert isinstance(torch_data, HeteroData)
+
+    # generate a data copy with just htree nodes (i.e. remove all virtual nodes)
+    data_htree = HeteroData()
+    for node_type in HTREE_NODE_TYPES:
+        data_htree[node_type].pos = torch_data[node_type].pos
+        data_htree[node_type].label = torch_data[node_type].label
+        data_htree[node_type].clique_has = torch_data[node_type].clique_has
+    for edge_type in HTREE_EDGE_TYPES:
+        data_htree[edge_type].edge_index = torch_data[edge_type].edge_index
+    data_htree = data_htree.to_homogeneous()
+
+    # find diameter of each connected component using networkx
+    nx_data = to_networkx(data_htree, node_attrs=['label', 'clique_has']).to_undirected()
+    diameters = []
+    valid_room_ids = []
+    for c in nx.connected_components(nx_data):
+        subgraph = nx_data.subgraph(c)
+        if valid_room_labels is None:
+            diameters.append(nx.diameter(subgraph))
+        else:   # skip subgraphs where all rooms are unlabeld -- i.e. ignored by training
+            # todo: this code does not distinguish room and object nodes -- but works on hydra labels
+            room_idx = [idx for idx, data_dict in subgraph.nodes.items() \
+                if data_dict['label'] in valid_room_labels]
+            # this assumes objects are saved before rooms in htree construction
+            offset = torch_data['object_virtual'].num_nodes
+            if len(room_idx) != 0:
+                diameters.append(nx.diameter(subgraph))
+                valid_room_ids.append(set(subgraph.nodes[idx]['clique_has'] - offset for idx in room_idx))
+    
+    if valid_room_labels is not None:
+        return diameters, valid_room_ids
+    else:
+        return diameters
+        
 # -----------------------------------------------------------------------------
 # Plot heterogenous torch data
 # -----------------------------------------------------------------------------
