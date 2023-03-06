@@ -279,48 +279,12 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
         if not use_heterogeneous:
             self.to_homogeneous()
-    
+
     def num_graph_nodes(self):
         if self.is_heterogeneous():
             return self._torch_data['room_virtual'].num_nodes + self._torch_data['object_virtual'].num_nodes
         else:
             return self._torch_data.room_mask.sum().item() + self._torch_data.object_mask.sum().item()
-    
-    def get_diameters(self, valid_room_labels=None, with_room_ids=False):
-        assert isinstance(self._torch_data, HeteroData)
-
-        # generate a data copy with just htree nodes (i.e. remove all virtual nodes)
-        data_htree = HeteroData()
-        for node_type in HTREE_NODE_TYPES:
-            data_htree[node_type].pos = self._torch_data[node_type].pos
-            data_htree[node_type].label = self._torch_data[node_type].label
-            data_htree[node_type].clique_has = self._torch_data[node_type].clique_has
-        for edge_type in HTREE_EDGE_TYPES:
-            data_htree[edge_type].edge_index = self._torch_data[edge_type].edge_index
-        data_htree = data_htree.to_homogeneous()
-
-        # find diameter of each connected component using networkx
-        nx_data = to_networkx(data_htree, node_attrs=['label', 'clique_has']).to_undirected()
-        diameters = []
-        valid_room_ids = []
-        for c in nx.connected_components(nx_data):
-            subgraph = nx_data.subgraph(c)
-            if valid_room_labels is None:
-                diameters.append(nx.diameter(subgraph))
-            else:   # skip subgraphs where all rooms are unlabeld -- i.e. ignored by training
-                # todo: this code does not distinguish room and object nodes -- but works on hydra labels
-                room_idx = [idx for idx, data_dict in subgraph.nodes.items() \
-                    if data_dict['label'] in valid_room_labels]
-                # this assumes objects are saved before rooms in htree construction
-                offset = self._torch_data['object_virtual'].num_nodes
-                if len(room_idx) != 0:
-                    diameters.append(nx.diameter(subgraph))
-                    valid_room_ids.append(set(subgraph.nodes[idx]['clique_has'] - offset for idx in room_idx))
-        
-        if with_room_ids:
-            return diameters, valid_room_ids
-        else:
-            return diameters
 
     def to_homogeneous(self):
         if isinstance(self._torch_data, HeteroData):
