@@ -45,20 +45,32 @@ def Stanford3DSG_room_feature_converter(word2vec_model, room_label_dict=STANFORD
 
 class Stanford3DSG_data(Hydra_mp3d_data):
     """
-    data class that takes in a Stanford 3D Scene Graph .npz file, converts and stores torch data for training.
+    Data class that converts and stores Stanford 3D Scene Graph for training. This can be initialized with an 
+    original .npz scene graph file or a pre-processsed data dictionary.
     """
-    def __init__(self, file_path, object_semantic_dict=STANFORD3D_OBJECT_SEMANTIC_LABEL_DICT, 
+    def __init__(self, file_path=None, data_dict=None,
+                 object_semantic_dict=STANFORD3D_OBJECT_SEMANTIC_LABEL_DICT, 
                  room_semantic_dict=STANFORD3D_ROOM_SEMANTIC_LABEL_DICT):
-        assert os.path.exists(file_path)
-        graph_data = np.load(file_path, allow_pickle=True)['output'].item()
-        self._scene_name = graph_data['building']['name']
-        self._scene_id = graph_data['building']['id']
-        self._gibson_split = graph_data['building']['gibson_split']
-        self._file_path = file_path
-        
-        # extract room-object graph
-        self._G_ro = self.get_room_object_dsg(graph_data, object_semantic_dict=object_semantic_dict,
-                                              room_semantic_dict=room_semantic_dict)
+        if file_path is not None:
+            assert os.path.exists(file_path)
+            graph_data = np.load(file_path, allow_pickle=True)['output'].item()
+            self._scene_name = graph_data['building']['name']
+            self._scene_id = graph_data['building']['id']
+            self._gibson_split = graph_data['building']['gibson_split']
+            self._file_path = file_path
+            
+            # extract room-object graph
+            self._G_ro = self.get_room_object_dsg(graph_data, 
+                                                  object_semantic_dict=object_semantic_dict,
+                                                  room_semantic_dict=room_semantic_dict)
+        else:
+            self._scene_name = 'N/A'
+            self._scene_id = 'N/A'
+            self._gibson_split = 'N/A'
+            self._file_path = 'N/A'
+
+            # extract room-object graph
+            self._G_ro = self.get_room_object_dsg_from_preprocessed_data(data_dict)
 
         # place-holder for torch room-object torch graphs
         self._torch_data = None
@@ -114,6 +126,57 @@ class Stanford3DSG_data(Hydra_mp3d_data):
             # insert room-object edge
             G_ro.insert_edge(object_id.value, room_id.value)
         return G_ro
+
+    @staticmethod
+    def get_room_object_dsg_from_preprocessed_data(data_dict):
+        # assert there is only one room node and it is node 0 in the input data_dict
+        assert data_dict['room_mask'][0]
+        assert data_dict['room_mask'].sum().item() == 1
+
+        # parse data_dict
+        x_room = data_dict['x'][data_dict['room_mask']][0]
+        x_objects = data_dict['x'][~data_dict['room_mask']]
+        y_room = data_dict['y'][data_dict['room_mask']][0]
+        y_objects = data_dict['y'][~data_dict['room_mask']]
+        edge_list = data_dict['edge_index'].T.tolist()
+
+        dsg = get_spark_dsg()
+        G_ro = dsg.DynamicSceneGraph()
+
+        # add room node
+        room_id = dsg._dsg_bindings.NodeSymbol("R", 0)
+        room_attr = dsg._dsg_bindings.RoomNodeAttributes()
+        room_attr.name = '0'
+        room_attr.position = x_room[:3]
+        room_attr.semantic_label = y_room
+        room_attr.bounding_box = dsg._dsg_bindings.BoundingBox(room_attr.position - x_room[3:]/2, 
+                                                            room_attr.position + x_room[3:]/2)
+        room_attr.bounding_box.world_P_center = room_attr.position
+        G_ro.add_node(dsg.DsgLayers.ROOMS, room_id.value, room_attr)
+
+        # add object nodes
+        num_objects = len(y_objects)
+        for i in range(num_objects):
+            object_id = dsg._dsg_bindings.NodeSymbol("O", i + 1)
+            object_attr = dsg._dsg_bindings.ObjectNodeAttributes()
+            object_attr.name = str(i + 1)
+            object_attr.position = x_objects[i, :3]
+            object_attr.semantic_label = y_objects[i]
+            object_attr.bounding_box = dsg._dsg_bindings.BoundingBox(object_attr.position - x_objects[i, 3:]/2, 
+                                                                    object_attr.position + x_objects[i, 3:]/2)
+            object_attr.bounding_box.world_P_center = object_attr.position
+            G_ro.add_node(dsg.DsgLayers.OBJECTS, object_id.value, object_attr)
+            assert G_ro.insert_edge(object_id.value, room_id.value)
+
+        # add object edges
+        for i, j in edge_list:
+            if i == 0 or j == 0:
+                continue
+            object_id_i = dsg._dsg_bindings.NodeSymbol("O", i)
+            object_id_j = dsg._dsg_bindings.NodeSymbol("O", j)
+            G_ro.insert_edge(object_id_i.value, object_id_j.value)
+
+        return G_ro
     
     def add_dsg_room_labels(self, **kwargs):
         pass
@@ -163,10 +226,11 @@ class Stanford3DSG_data(Hydra_mp3d_data):
 
 
 class Stanford3DSG_htree_data(Stanford3DSG_data):
-    def __init__(self, file_path, object_label_dict=STANFORD3D_OBJECT_SEMANTIC_LABEL_DICT, 
-                 room_label_dict=STANFORD3D_ROOM_SEMANTIC_LABEL_DICT):
+    def __init__(self, file_path=None, data_dict=None,
+                 object_semantic_dict=STANFORD3D_OBJECT_SEMANTIC_LABEL_DICT, 
+                 room_semantic_dict=STANFORD3D_ROOM_SEMANTIC_LABEL_DICT):
         super(Stanford3DSG_htree_data, self).__init__(
-            file_path, object_label_dict, room_label_dict)
+            file_path, data_dict, object_semantic_dict, room_semantic_dict)
 
     def compute_torch_data(self, use_heterogeneous: bool, node_converter, double_precision=False):
         """compute self._torch data by converting self._G_ro to htree in torch data format"""
