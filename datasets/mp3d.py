@@ -4,18 +4,13 @@ import os
 import networkx as nx
 from torch_geometric.data import Data
 from torch_geometric.utils import to_networkx
-import numpy as np
 import torch
-import torch_geometric
 import spark_dsg as dsg
 import glob
-from pathlib import Path
 
-from spark_dsg.mp3d import load_mp3d_info, repartition_rooms, add_gt_room_label
-from spark_dsg.torch_conversion import _centroid_bbx_embedding
 
 sys.path.append('../')
-from hydra_gnn.preprocess_dsgs import convert_label_to_y, add_object_connectivity, get_room_object_dsg
+from hydra_gnn.preprocess_dsgs import add_object_connectivity, get_room_object_dsg
 
 BASE_DIR = '../'
 
@@ -40,7 +35,7 @@ def extract_object_graph(graph_torch, to_nx=True):
             print("This graph has no object_to_object edges.")
 
         if to_nx:
-            object_graph = to_networkx(object_graph, to_undirected=True)
+            object_graph = to_networkx(object_graph).to_undirected()
 
     return object_graph
 
@@ -66,7 +61,7 @@ def extract_room_graph(graph_torch, to_nx=True):
                               edge_index=torch.zeros(2, 0).to(dtype=torch.long))
 
         if to_nx:
-            room_graph = to_networkx(room_graph, to_undirected=True)
+            room_graph = to_networkx(room_graph).to_undirected()
 
     return room_graph
 

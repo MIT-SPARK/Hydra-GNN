@@ -44,8 +44,8 @@ def get_treewidth(torch_data, graph_type='full'):
     """
     assert graph_type in ['full', 'object', 'room']
     if graph_type == 'full':
-        nx_graph = to_networkx(torch_data.to_homogeneous()) if isinstance(torch_data, HeteroData) \
-            else to_networkx(torch_data)
+        nx_graph = to_networkx(torch_data.to_homogeneous()).to_undirected() \
+            if isinstance(torch_data, HeteroData) else to_networkx(torch_data).to_undirected()
     elif graph_type == 'object':
         nx_graph = extract_object_graph(torch_data, to_nx=True)
     else:
