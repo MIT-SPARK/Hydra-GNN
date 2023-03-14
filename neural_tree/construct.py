@@ -70,7 +70,7 @@ def get_object_graph(dsg_nx, room_idx):
 
 
 def generate_component_jth(dsg_nx_component, component_type, num_zero_padding, room_node_data=None, \
-    treewidth_bound=10, verbose=False):
+    treewidth_bound=1000, verbose=False):
     """
     Generates jth and root_nodes, given either room graph or objects graph in dsg_nx format
     """

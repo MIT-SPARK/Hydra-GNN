@@ -4,7 +4,7 @@ import os.path
 import torch.utils
 import torch.nn.functional
 import networkx as nx
-from torch_geometric.utils import to_networkx, is_undirected
+from torch_geometric.utils import is_undirected
 from torch_geometric.data import HeteroData
 
 

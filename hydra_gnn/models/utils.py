@@ -11,6 +11,8 @@ def build_conv_layer(conv_block, input_dim, output_dim, **kwargs):
     """
     if conv_block == 'GraphSAGE':
         return pyg_nn.SAGEConv(input_dim, output_dim, normalize=False, bias=True)
+    elif conv_block == 'GCN':
+        return pyg_nn.GCNConv(input_dim, output_dim, add_self_loops=True)
     elif conv_block == 'GIN':
         return pyg_nn.GINConv(nn.Sequential(nn.Linear(input_dim, output_dim), nn.ReLU(),
                                             nn.Linear(output_dim, output_dim)), eps=0., train_eps=True)
