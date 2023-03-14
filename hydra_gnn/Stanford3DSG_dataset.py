@@ -60,9 +60,9 @@ class Stanford3DSG_data(Hydra_mp3d_data):
             self._file_path = file_path
             
             # extract room-object graph
-            self._G_ro = self.get_room_object_dsg(graph_data, 
-                                                  object_semantic_dict=object_semantic_dict,
-                                                  room_semantic_dict=room_semantic_dict)
+            self._G_ro = self.get_room_object_dsg_from_gt(graph_data, 
+                                                          object_semantic_dict=object_semantic_dict,
+                                                          room_semantic_dict=room_semantic_dict)
         else:
             self._scene_name = 'N/A'
             self._scene_id = 'N/A'
@@ -79,8 +79,8 @@ class Stanford3DSG_data(Hydra_mp3d_data):
         self._room_semantic_dict = room_semantic_dict
     
     @staticmethod
-    def get_room_object_dsg(graph_data, object_semantic_dict=STANFORD3D_OBJECT_SEMANTIC_LABEL_DICT,
-                            room_semantic_dict=STANFORD3D_ROOM_SEMANTIC_LABEL_DICT):
+    def get_room_object_dsg_from_gt(graph_data, object_semantic_dict=STANFORD3D_OBJECT_SEMANTIC_LABEL_DICT,
+                                    room_semantic_dict=STANFORD3D_ROOM_SEMANTIC_LABEL_DICT):
         # drop object if 
         #   (1) object has no parent room; or 
         #   (2) object label not in object_label_dict.keys(); or 
