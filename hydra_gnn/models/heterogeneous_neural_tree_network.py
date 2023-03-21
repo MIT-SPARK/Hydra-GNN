@@ -115,11 +115,17 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
                      for key, x in x_dict.items()}
         
         # pool room nodes' final hidden state to room_virtual nodes
-        x_room = self.post_mp(x_dict['room'], edge_index_dict['room', 'r_to_rv', 'room_virtual'])\
-            [0: data['room_virtual'].num_nodes]
         if self.classification_task == 'room':
+            x_room = self.post_mp(x_dict['room'], edge_index_dict['room', 'r_to_rv', 'room_virtual']) \
+                [0: data['room_virtual'].num_nodes]
             return x_room
         else:
+            x_dict = {key: F.relu(x) for key, x in x_dict.items()} if self.conv_block[:3] != 'GAT' \
+                else {key: F.elu(x) for key, x in x_dict.items()}
+            x_dict = {key: F.dropout(x, p=self.dropout, training=self.training) \
+                    for key, x in x_dict.items()}
+            x_room = self.post_mp(x_dict['room'], edge_index_dict['room', 'r_to_rv', 'room_virtual']) \
+                [0: data['room_virtual'].num_nodes]
             x_object = self.post_mp(x_dict['object'], edge_index_dict['object', 'o_to_ov', 'object_virtual'])\
                 [0: data['object_virtual'].num_nodes]
             return x_room, x_object

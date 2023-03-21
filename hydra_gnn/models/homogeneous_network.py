@@ -92,6 +92,8 @@ class HomogeneousNetwork(nn.Module):
         if self.classification_task == 'room':
             return x[room_mask, :]
         else:
+            x = F.relu(x) if self.conv_block[:3] != 'GAT' else F.elu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
             return self.post_mp_room(x[room_mask, :]), self.post_mp_object(x[~room_mask, :])
 
     def loss(self, pred, label, mask=None):

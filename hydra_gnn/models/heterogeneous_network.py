@@ -72,6 +72,10 @@ class HeterogeneousNetwork(nn.Module):
         if self.classification_task == 'room':
             return x_dict['rooms']
         else:
+            x_dict = {key: F.relu(x) for key, x in x_dict.items()} if self.conv_block[:3] != 'GAT' \
+                else {key: F.elu(x) for key, x in x_dict.items()}
+            x_dict = {key: F.dropout(x, p=self.dropout, training=self.training) \
+                    for key, x in x_dict.items()}
             return x_dict['rooms'], x_dict['objects']
 
     def loss(self, pred, label, mask=None):

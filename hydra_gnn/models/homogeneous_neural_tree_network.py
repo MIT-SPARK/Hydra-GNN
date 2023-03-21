@@ -28,7 +28,7 @@ class HomogeneousNeuralTreeNetwork(HomogeneousNetwork):
         """
         super(HomogeneousNeuralTreeNetwork, self).__init__(input_dim, output_dim, output_dim_dict, conv_block, hidden_dim, 
                                                            num_layers, GAT_hidden_dims, GAT_heads, GAT_concats, dropout, **kwargs)
-        assert conv_block in ['GraphSAGE', 'GAT', 'GAT_edge']
+        assert conv_block in ['GCN', 'GraphSAGE', 'GAT', 'GAT_edge']
 
         # initialize clique features -- keep dimension the same
         self.pre_mp = pyg_nn.GATConv(input_dim, input_dim, heads=1, concat=False, dropout=0.0, add_self_loops=False)
@@ -59,5 +59,7 @@ class HomogeneousNeuralTreeNetwork(HomogeneousNetwork):
         if self.classification_task == 'room':
             return x[room_mask, :]
         else:
+            x = F.relu(x) if self.conv_block[:3] != 'GAT' else F.elu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
             return self.post_mp_room(x[room_mask, :]), self.post_mp_object(x[data.object_mask, :])
         
