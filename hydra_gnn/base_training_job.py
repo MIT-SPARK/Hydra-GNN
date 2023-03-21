@@ -146,6 +146,7 @@ class BaseTrainingJob:
         for epoch in range(optimization_params['num_epochs']):
             early_stop_step += 1
             total_loss = 0.
+            num_train_labels = 0
             self._net.train()
             for batch in train_loader:
                 opt.zero_grad()
@@ -163,8 +164,9 @@ class BaseTrainingJob:
                 loss.backward()
                 opt.step()
 
-                total_loss += loss.item() * batch.num_graphs
-            total_loss /= len(train_loader.dataset)
+                total_loss += loss.item()
+                num_train_labels += mask.sum().item()
+            total_loss /= num_train_labels
             writer.add_scalar('loss', total_loss, epoch)
 
             # writer.add_scalar('lr', opt.param_groups[0]["lr"], epoch)
