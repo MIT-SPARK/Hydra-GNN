@@ -165,20 +165,20 @@ if __name__ == "__main__":
             training_epoch_list.append(info['num_epochs'])
             test_time_list.append(info['test_time'])
 
-            # log type separated accuracy
-            val_room_accuracy, val_object_accuracy = train_job.test(mask_name='val_mask', get_type_separated_accuracy=True)
-            test_room_accuracy, test_object_accuracy = train_job.test(mask_name='test_mask', get_type_separated_accuracy=True)
-            val_room_accuracy_list.append(val_room_accuracy * 100)
-            val_object_accuracy_list.append(val_object_accuracy * 100)
-            test_room_accuracy_list.append(test_room_accuracy * 100)
-            test_object_accuracy_list.append(test_object_accuracy * 100)
-            print(f"\nValidation accuracy: {mean(val_accuracy_list)} +/- {stdev(val_accuracy_list)}")
-            print(f"    room: {mean(val_room_accuracy_list)} +/- {stdev(val_room_accuracy_list)}")
-            print(f"    object: {mean(val_object_accuracy_list)} +/- {stdev(val_object_accuracy_list)}")
+        # print type separated accuracy
+        val_room_accuracy, val_object_accuracy = train_job.test(mask_name='val_mask', get_type_separated_accuracy=True)
+        test_room_accuracy, test_object_accuracy = train_job.test(mask_name='test_mask', get_type_separated_accuracy=True)
+        val_room_accuracy_list.append(val_room_accuracy * 100)
+        val_object_accuracy_list.append(val_object_accuracy * 100)
+        test_room_accuracy_list.append(test_room_accuracy * 100)
+        test_object_accuracy_list.append(test_object_accuracy * 100)
+        print(f"\nValidation accuracy: {mean(val_accuracy_list)} +/- {stdev(val_accuracy_list)}")
+        print(f"    room: {mean(val_room_accuracy_list)} +/- {stdev(val_room_accuracy_list)}")
+        print(f"    object: {mean(val_object_accuracy_list)} +/- {stdev(val_object_accuracy_list)}")
 
-            print(f"Test accuracy: {mean(test_accuracy_list)} +/- {stdev(test_accuracy_list)}")
-            print(f"    room: {mean(test_room_accuracy_list)} +/- {stdev(test_room_accuracy_list)}")
-            print(f"    object: {mean(test_object_accuracy_list)} +/- {stdev(test_object_accuracy_list)}")
+        print(f"Test accuracy: {mean(test_accuracy_list)} +/- {stdev(test_accuracy_list)}")
+        print(f"    room: {mean(test_room_accuracy_list)} +/- {stdev(test_room_accuracy_list)}")
+        print(f"    object: {mean(test_object_accuracy_list)} +/- {stdev(test_object_accuracy_list)}")
 
         # save param and accuracy
         accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
