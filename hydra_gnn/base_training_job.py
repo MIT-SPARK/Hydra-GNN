@@ -164,7 +164,7 @@ class BaseTrainingJob:
                 loss.backward()
                 opt.step()
 
-                total_loss += loss.item()
+                total_loss += loss.item() * mask.sum().item()
                 num_train_labels += mask.sum().item()
             total_loss /= num_train_labels
             writer.add_scalar('loss', total_loss, epoch)
