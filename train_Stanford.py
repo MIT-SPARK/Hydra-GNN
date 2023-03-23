@@ -1,4 +1,4 @@
-from hydra_gnn.utils import PROJECT_DIR, STANFORD3DSG_GRAPH_DIR, \
+from hydra_gnn.utils import PROJECT_DIR, STANFORD3DSG_GRAPH_PATH, \
     plist, pgrid, update_existing_keys
 from hydra_gnn.Stanford3DSG_dataset import Stanford3DSG_htree_data, Stanford3DSG_data, \
     Stanford3DSG_dataset
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         os.mkdir(output_dir)
     
     # create torch data lists from saved graph data
-    with open(STANFORD3DSG_GRAPH_DIR, 'rb') as input_file:
+    with open(STANFORD3DSG_GRAPH_PATH, 'rb') as input_file:
         saved_data_list, semantic_dict, num_labels = pickle.load(input_file)
         room_label_dict = semantic_dict['room']
         object_label_dict = semantic_dict['object']
