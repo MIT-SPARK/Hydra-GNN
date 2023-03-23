@@ -19,7 +19,7 @@ from pprint import pprint
 
 # parameter sweep setup
 GAT_hidden_dims = plist('GAT_hidden_dims', [[32, 32], [64, 64], [32, 32, 32], [64, 64, 64]])
-dropout = plist('dropout', [0.2])
+dropout = plist('dropout', [0.4])
 lr = plist('lr', [0.002])
 weight_decay = plist('weight_decay', [0.0])
 param_dict_list = pgrid(lr, weight_decay, GAT_hidden_dims, dropout)
@@ -53,8 +53,9 @@ if __name__ == "__main__":
     # setup log folder, accuracy files
     print(f"output direcotry: {output_dir}")
     if os.path.exists(output_dir):
-        if task_id == 0:
-            input("Output directory exists. Existing contents might be over-written. Press any key to proceed...")
+        print("Existing contents might be over-written.")
+        # if task_id == 0:
+        #     input("Output directory exists. Existing contents might be over-written. Press any key to proceed...")
     else:
         os.mkdir(output_dir)
     
