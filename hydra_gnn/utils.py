@@ -22,6 +22,7 @@ MP3D_OBJECT_LABEL_DATA_PATH = os.path.join(DATA_DIR, "mpcat40.tsv")
 HYDRA_TRAJ_DIR = os.path.join(DATA_DIR, "tro_graphs_2022_09_24")
 COLORMAP_DATA_PATH = os.path.join(DATA_DIR, "colormap.csv")
 STANFORD3DSG_DATA_DIR = os.path.join(PROJECT_DIR, "data/Stanford3DSceneGraph/tiny/verified_graph")
+STANFORD3DSG_GRAPH_DIR = os.path.join(PROJECT_DIR, "data/Stanford3DSG.pkl")
 WORD2VEC_MODEL_PATH = os.path.join(DATA_DIR, "GoogleNews-vectors-negative300.bin")
 
 
