@@ -367,6 +367,32 @@ class Stanford3DSG_dataset(torch.utils.data.Dataset):
                 raise NotImplemented
         
         assert len(random_assignment_list) == 0
+    
+    def print_data_split(self):
+        data_type = self.data_type()
+        if data_type == 'homogeneous':
+            count_func = lambda split_mask, is_room: \
+                sum(torch_data[split_mask][torch_data['room_mask']].sum().item() for torch_data in self) if is_room \
+                    else sum(torch_data[split_mask][~torch_data['room_mask']].sum().item() for torch_data in self) 
+        elif data_type == 'heterogeneous':
+            count_func = lambda split_mask, is_room: \
+                sum(torch_data['rooms'][split_mask].sum().item() for torch_data in self) if is_room \
+                    else sum(torch_data['objects'][split_mask].sum().item() for torch_data in self)
+        elif data_type == 'homogeneous_htree':
+            count_func = lambda split_mask, is_room: \
+                sum(torch_data[split_mask][torch_data.room_mask].sum().item() for torch_data in self) if is_room \
+                    else sum(torch_data[split_mask][torch_data.object_mask].sum().item() for torch_data in self)
+        else:
+            count_func = lambda split_mask, is_room: \
+                sum(torch_data['room_virtual'][split_mask].sum().item() for torch_data in self) if is_room \
+                    else sum(torch_data['object_virtual'][split_mask].sum().item() for torch_data in self)
+        
+        train_room, val_room, test_room = \
+            count_func('train_mask', True), count_func('val_mask', True), count_func('test_mask', True)
+        train_object, val_object, test_object = \
+            count_func('train_mask', False), count_func('val_mask', False), count_func('test_mask', False)
+        print(f"room split({train_room+val_room+test_room}): {train_room}/{val_room}/{test_room} | "
+            f"object split({train_object+val_object+test_object}): {train_object}/{val_object}/{test_object}")
 
     def clear_dataset(self):
         self._data_list = []
