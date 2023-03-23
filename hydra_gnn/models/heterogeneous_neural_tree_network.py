@@ -58,7 +58,6 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
         self.dropout = dropout
 
         # dimension dictionaries
-        # assert input_dim_dict['object'] == input_dim_dict['room']
         assert input_dim_dict['object'] == input_dim_dict['object_virtual']
         assert input_dim_dict['room'] == input_dim_dict['room_virtual']
         assert input_dim_dict['object-room'] == input_dim_dict['room-room']
@@ -105,6 +104,9 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
         for i in range(self.num_layers):
             if self.conv_block == 'GAT_edge':
                 x_dict = self.convs[i](x_dict, edge_index_dict, data.edge_attr_dict)
+            elif self.conv_block == 'PointTransformer':
+                pos_attr_dict = {edge_type: (data[edge_type[0]].pos, data[edge_type[-1]].pos) for edge_type in HTREE_EDGE_TYPES}
+                x_dict = self.convs[i](x_dict=x_dict, edge_index_dict=edge_index_dict, pos_dict=pos_attr_dict)
             else:
                 x_dict = self.convs[i](x_dict, edge_index_dict)
             
