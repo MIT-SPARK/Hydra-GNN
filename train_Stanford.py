@@ -1,9 +1,6 @@
-from hydra_gnn.utils import PROJECT_DIR, STANFORD3DSG_GRAPH_PATH, \
-    plist, pgrid, update_existing_keys
-from hydra_gnn.Stanford3DSG_dataset import Stanford3DSG_htree_data, Stanford3DSG_data, \
-    Stanford3DSG_dataset
+from hydra_gnn.utils import PROJECT_DIR, plist, pgrid, update_existing_keys
+from hydra_gnn.Stanford3DSG_dataset import Stanford3DSG_htree_data, Stanford3DSG_dataset
 from hydra_gnn.semisupervised_training_job import SemiSupervisedTrainingJob
-from hydra_gnn.preprocess_dsgs import dsg_node_converter
 from statistics import mean, stdev
 import os
 import shutil
@@ -17,8 +14,8 @@ from pprint import pprint
 
 
 # parameter sweep setup (note: last GAT hidden_dims is label dim and therefore not specified)
-GAT_hidden_dims = plist('GAT_hidden_dims', [[128], [128, 128], [128, 128, 128]])
-dropout = plist('dropout', [0.25, 0.5])
+GAT_hidden_dims = plist('GAT_hidden_dims', [[128], [128, 128]])
+dropout = plist('dropout', [0.1, 0.2, 0.3])
 lr = plist('lr', [0.001])
 weight_decay = plist('weight_decay', [0.0])
 param_dict_list = pgrid(lr, weight_decay, GAT_hidden_dims, dropout)
@@ -29,10 +26,10 @@ if __name__ == "__main__":
     parser.add_argument('--task_id', default=0, type=int, help="slurm array task ID")
     parser.add_argument('--num_tasks', default=1, type=int, help="total number of slurm array tasks")
     parser.add_argument('--gpu_index', default=-1, type=int, help="gpu index (default: task_id)")
-    parser.add_argument('--config_file', default=os.path.join(PROJECT_DIR, 'config/mp3d_default_config.yaml'),
+    parser.add_argument('--config_file', default=os.path.join(PROJECT_DIR, 'config/Stanford3DSG_default_config.yaml'),
                         help='training config file')
-    parser.add_argument('--use_htree', action='store_true',
-                        help='use htree instead of original graph for learning')
+    parser.add_argument('--train_val_ratio', default=(0.7, 0.1), type=float, nargs=2, 
+                        help='training and validation ratio')
     args = parser.parse_args()
 
     print(f"cuda available: {torch.cuda.is_available()}")
@@ -56,33 +53,11 @@ if __name__ == "__main__":
     else:
         os.mkdir(output_dir)
     
-    # create torch data lists from saved graph data
-    with open(STANFORD3DSG_GRAPH_PATH, 'rb') as input_file:
-        saved_data_list, semantic_dict, num_labels = pickle.load(input_file)
-        room_label_dict = semantic_dict['room']
-        object_label_dict = semantic_dict['object']
-    
-    object_feature_converter = lambda i: np.zeros(0)
-    room_feature_converter = lambda i: np.zeros(0)
-    node_converter = dsg_node_converter(object_feature_converter, room_feature_converter)
-    data_list = []
-    for i in range(len(saved_data_list['x_list'])):
-        data_dict = {'x': saved_data_list['x_list'][i],
-                     'y': saved_data_list['y_list'][i],
-                     'edge_index': saved_data_list['edge_index_list'][i],
-                     'room_mask': saved_data_list['room_mask_list'][i]}
-        if args.use_htree:
-            data = Stanford3DSG_htree_data(data_dict=data_dict, 
-                                           room_semantic_dict=semantic_dict['room'], 
-                                           object_semantic_dict=semantic_dict['object'])
-        else:
-            data = Stanford3DSG_data(data_dict=data_dict, 
-                                     room_semantic_dict=semantic_dict['room'], 
-                                     object_semantic_dict=semantic_dict['object'])
-            
-        # use hetero data first, compute_relative_pose() does not work with homogeneous data
-        data.compute_torch_data(use_heterogeneous=True, node_converter=node_converter)
-        
+    # load data and prepare dataset
+    dataset = Stanford3DSG_dataset()
+    with open(dataset_path, 'rb') as input_file:
+        data_list = pickle.load(input_file)
+    for data in data_list:
         if config['network']['conv_block'] == 'GAT_edge':
             data.compute_relative_pos()
         if config['data']['type'] == 'homogeneous':
@@ -91,11 +66,6 @@ if __name__ == "__main__":
         # set clique node features to zero to be consistent with NT paper
         if isinstance(data, Stanford3DSG_htree_data) and config['data']['type'] == 'homogeneous':
             data.get_torch_data().x[data.get_torch_data().clique_has == -1] = 0 
-        data_list.append(data)
-
-    # preprare dataset
-    dataset = Stanford3DSG_dataset()
-    for data in data_list:
         dataset.add_data(data)
 
     # log resutls
@@ -104,6 +74,11 @@ if __name__ == "__main__":
         ['val_' + str(i) for i in range(config['run_control']['num_runs'])] + \
             ['test_' + str(i) for i in range(config['run_control']['num_runs'])] + \
                 ['avg num_epochs', 'avg training_time/ecpho (s)', 'avg test_time (s)'])
+
+    # node split
+    train_ratio, val_ratio = args.train_val_ratio[0], args.train_val_ratio[1]
+    test_ratio = 1 - train_ratio - val_ratio
+    print(f"Train val test split ratio: {train_ratio} : {val_ratio} : {test_ratio}")
 
     # update parameter
     num_param_set = len(param_dict_list)
@@ -151,7 +126,7 @@ if __name__ == "__main__":
         test_time_list = []
         for j in range(config['run_control']['num_runs']):
             print(f"\nRun {j + 1} / {config['run_control']['num_runs']}:")
-            dataset.generate_node_split(0.7, 0.1, 0.2, seed=j)
+            dataset.generate_node_split(train_ratio, val_ratio, test_ratio, seed=j)
             train_job = SemiSupervisedTrainingJob(dataset=dataset,
                                                   network_params=config['network'])
             model, best_acc, info = train_job.train(f"{experiment_output_dir_i}/{j}", 
@@ -165,13 +140,14 @@ if __name__ == "__main__":
             training_epoch_list.append(info['num_epochs'])
             test_time_list.append(info['test_time'])
 
+            val_room_accuracy, val_object_accuracy = train_job.test(mask_name='val_mask', get_type_separated_accuracy=True)
+            test_room_accuracy, test_object_accuracy = train_job.test(mask_name='test_mask', get_type_separated_accuracy=True)
+            val_room_accuracy_list.append(val_room_accuracy * 100)
+            val_object_accuracy_list.append(val_object_accuracy * 100)
+            test_room_accuracy_list.append(test_room_accuracy * 100)
+            test_object_accuracy_list.append(test_object_accuracy * 100)
+        
         # print type separated accuracy
-        val_room_accuracy, val_object_accuracy = train_job.test(mask_name='val_mask', get_type_separated_accuracy=True)
-        test_room_accuracy, test_object_accuracy = train_job.test(mask_name='test_mask', get_type_separated_accuracy=True)
-        val_room_accuracy_list.append(val_room_accuracy * 100)
-        val_object_accuracy_list.append(val_object_accuracy * 100)
-        test_room_accuracy_list.append(test_room_accuracy * 100)
-        test_object_accuracy_list.append(test_object_accuracy * 100)
         print(f"\nValidation accuracy: {mean(val_accuracy_list)} +/- {stdev(val_accuracy_list)}")
         print(f"    room: {mean(val_room_accuracy_list)} +/- {stdev(val_room_accuracy_list)}")
         print(f"    object: {mean(val_object_accuracy_list)} +/- {stdev(val_object_accuracy_list)}")
