@@ -30,6 +30,8 @@ if __name__ == "__main__":
                         help='training config file')
     parser.add_argument('--train_val_ratio', default=(0.7, 0.1), type=float, nargs=2, 
                         help='training and validation ratio')
+    parser.add_argument('--single_experiment', action='store_true',
+                        help="run single experiment using config file instead of parameter sweep")
     args = parser.parse_args()
 
     print(f"cuda available: {torch.cuda.is_available()}")
@@ -80,38 +82,52 @@ if __name__ == "__main__":
     test_ratio = 1 - train_ratio - val_ratio
     print(f"Train val test split ratio: {train_ratio} : {val_ratio} : {test_ratio}")
 
-    # update parameter
-    num_param_set = len(param_dict_list)
-    experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
-    for experiment_i in experiment_id_list:
-        print(f"\nExperiment {experiment_i+1} / {len(param_dict_list)}")
-        param_dict = param_dict_list[experiment_i]
+    # run experiment
+    if args.single_experiment:
+        experiment_id_list = [0]
+    else:
+        num_param_set = len(param_dict_list)
+        experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
         
-        if config['network']['conv_block'][:3] == 'GAT':
-            # todo: this is for temporary GAT tuning with single attention head
-            param_dict['GAT_heads'] = len(param_dict['GAT_hidden_dims']) * [6] + [6]
-            param_dict['GAT_concats'] = len(param_dict['GAT_hidden_dims']) * [True] + [True]
+    for experiment_i in experiment_id_list:
+        if args.single_experiment:
+            print(f"\nUse all parameters in config: {args.config_file}")
+            experiment_output_dir_i = os.path.join(output_dir, "experiment")
+            config_output_path = os.path.join(output_dir, "config.yaml")
+            accuracy_file_path = os.path.join(output_dir, "accuracy.csv")
+            param_list = ['-'] * len(log_params)
+        else:
+            print(f"\nExperiment {experiment_i+1} / {len(param_dict_list)}")
+            experiment_output_dir_i = os.path.join(output_dir, f"experiment_{experiment_i}")
+            config_output_path = os.path.join(experiment_output_dir_i, "config.yaml")
+            accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
+            # update parameter
+            param_dict = param_dict_list[experiment_i]
+            param_list = [param_dict[key] for key in log_params]
+            if config['network']['conv_block'][:3] == 'GAT':
+                # todo: this is for temporary GAT tuning with single attention head
+                param_dict['GAT_heads'] = len(param_dict['GAT_hidden_dims']) * [6] + [6]
+                param_dict['GAT_concats'] = len(param_dict['GAT_hidden_dims']) * [True] + [True]
 
-            # check GAT params
-            if len(param_dict['GAT_heads']) != len(param_dict['GAT_hidden_dims']) + 1 or \
-                len(param_dict['GAT_concats']) != len(param_dict['GAT_hidden_dims']) + 1:
-                print('  Skip - invalid GAT param')
-                continue
+                # check GAT params
+                if len(param_dict['GAT_heads']) != len(param_dict['GAT_hidden_dims']) + 1 or \
+                    len(param_dict['GAT_concats']) != len(param_dict['GAT_hidden_dims']) + 1:
+                    print('  Skip - invalid GAT param')
+                    continue
+            update_existing_keys(config['network'], param_dict)
+            update_existing_keys(config['optimization'], param_dict)
 
-        update_existing_keys(config['network'], param_dict)
-        update_existing_keys(config['optimization'], param_dict)
         pprint('config:')
         pprint(config)
 
-        # clean up output directory
-        experiment_output_dir_i = os.path.join(output_dir, f"experiment_{experiment_i}")
+        # clean up tensorboard output directory
         if os.path.exists(experiment_output_dir_i):
             shutil.rmtree(experiment_output_dir_i)
             print(f"Overwritting experiment output folder {experiment_output_dir_i}")
         os.mkdir(experiment_output_dir_i)
-
+        
         # save config
-        with open(os.path.join(experiment_output_dir_i, 'config.yaml'), 'w') as output_file:
+        with open(config_output_path, 'w') as output_file:
             yaml.dump(config, output_file, default_flow_style=False)
 
         # run experiment
@@ -145,21 +161,21 @@ if __name__ == "__main__":
             val_room_accuracy_list.append(val_room_accuracy * 100)
             val_object_accuracy_list.append(val_object_accuracy * 100)
             test_room_accuracy_list.append(test_room_accuracy * 100)
-            test_object_accuracy_list.append(test_object_accuracy * 100)
-        
-        # print type separated accuracy
-        print(f"\nValidation accuracy: {mean(val_accuracy_list)} +/- {stdev(val_accuracy_list)}")
-        print(f"    room: {mean(val_room_accuracy_list)} +/- {stdev(val_room_accuracy_list)}")
-        print(f"    object: {mean(val_object_accuracy_list)} +/- {stdev(val_object_accuracy_list)}")
-
-        print(f"Test accuracy: {mean(test_accuracy_list)} +/- {stdev(test_accuracy_list)}")
-        print(f"    room: {mean(test_room_accuracy_list)} +/- {stdev(test_room_accuracy_list)}")
-        print(f"    object: {mean(test_object_accuracy_list)} +/- {stdev(test_object_accuracy_list)}")
+            test_object_accuracy_list.append(test_object_accuracy * 100)        
 
         # save param and accuracy
-        accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
-        output_data_list = [f"experiment_{experiment_i}"] + [param_dict[key] for key in log_params] + \
-            val_accuracy_list + test_accuracy_list + \
+        output_data_list = [f"experiment_{experiment_i}"] + param_list + val_accuracy_list + test_accuracy_list + \
                 [mean(training_epoch_list), sum(training_time_list) / sum(training_epoch_list), mean(test_time_list)]
         df = pd.concat([df, pd.DataFrame(data=[output_data_list], columns = df.columns)])
         df.to_csv(accuracy_file_path, index=False)
+
+        # save type separated accuracy for single experiment
+        if args.single_experiment:
+            with open(accuracy_file_path, 'a') as output_file:
+                print(f"\nValidation accuracy: {mean(val_accuracy_list)} +/- {stdev(val_accuracy_list)}", file=output_file)
+                print(f"    room: {mean(val_room_accuracy_list)} +/- {stdev(val_room_accuracy_list)}", file=output_file)
+                print(f"    object: {mean(val_object_accuracy_list)} +/- {stdev(val_object_accuracy_list)}", file=output_file)
+
+                print(f"Test accuracy: {mean(test_accuracy_list)} +/- {stdev(test_accuracy_list)}", file=output_file)
+                print(f"    room: {mean(test_room_accuracy_list)} +/- {stdev(test_room_accuracy_list)}", file=output_file)
+                print(f"    object: {mean(test_object_accuracy_list)} +/- {stdev(test_object_accuracy_list)}", file=output_file)
