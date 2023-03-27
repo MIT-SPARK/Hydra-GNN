@@ -9,10 +9,10 @@ import spark_dsg as dsg
 import glob
 
 
-sys.path.append('../')
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(BASE_DIR)
 from hydra_gnn.preprocess_dsgs import add_object_connectivity, get_room_object_dsg
 
-BASE_DIR = '../'
 
 
 def extract_object_graph(graph_torch, to_nx=True):
