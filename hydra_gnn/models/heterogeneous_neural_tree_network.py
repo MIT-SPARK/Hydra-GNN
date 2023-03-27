@@ -27,7 +27,7 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
     This HeterogeneousNeuralTreeNetwork class implements message passing on augmented htrees, which includes the htree and virtual 
     nodes for initialization and most message-passing pooling.
     """
-    def __init__(self, input_dim_dict, output_dim=None, output_dim_dict=None, conv_block='GraphSAGE',
+    def __init__(self, input_dim_dict, output_dim=None, output_dim_dict=None, conv_block='GraphSAGE', disable_initialization=False,
                  hidden_dim=None, num_layers=None, GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
         """
         :param input_dim_dict: dictionary of node type to input feature dimension mapping
@@ -63,12 +63,16 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
         assert input_dim_dict['object-room'] == input_dim_dict['room-room']
 
         # initialize clique features - match output dimension with leaf dimension
-        conv_dict = dict()
-        for source, edge_name, target in HTREE_INIT_EDGE_TYPES:
-            conv_dict[source, edge_name, target] = \
-                pyg_nn.GATConv((input_dim_dict[source], input_dim_dict[target]), input_dim_dict[target], 
-                               heads=1, concat=False, dropout=0.0, add_self_loops=False)
-        self.pre_mp = HeteroConv(conv_dict, aggr='mean')
+        if disable_initialization:
+            self.pre_mp = None
+            print("diable initialization")
+        else:
+            conv_dict = dict()
+            for source, edge_name, target in HTREE_INIT_EDGE_TYPES:
+                conv_dict[source, edge_name, target] = \
+                    pyg_nn.GATConv((input_dim_dict[source], input_dim_dict[target]), input_dim_dict[target], 
+                                heads=1, concat=False, dropout=0.0, add_self_loops=False)
+            self.pre_mp = HeteroConv(conv_dict, aggr='mean')
 
         # message passing
         mp_input_dim_dict = {node_type: input_dim_dict[node_type] for node_type in HTREE_NODE_TYPES}
@@ -98,7 +102,8 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
         x_dict, edge_index_dict = data.x_dict, data.edge_index_dict
 
         # initialize clique nodes
-        x_dict.update(self.pre_mp(x_dict, edge_index_dict))
+        if self.pre_mp is not None:
+            x_dict.update(self.pre_mp(x_dict, edge_index_dict))
 
         # x = F.dropout(x, p=self.dropout, training=self.training)
         for i in range(self.num_layers):

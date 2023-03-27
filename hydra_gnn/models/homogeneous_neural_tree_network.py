@@ -9,7 +9,7 @@ class HomogeneousNeuralTreeNetwork(HomogeneousNetwork):
     This HomogeneousNeuralTreeNetwork class implements pre-message passing initialization (of clique nodes) using virtual nodes,
     homogeneous message passing on htrees, and post message passing pooling from leaf nodes to virtual nodes.
     """
-    def __init__(self, input_dim, output_dim=None, output_dim_dict=None, conv_block='GCN', 
+    def __init__(self, input_dim, output_dim=None, output_dim_dict=None, conv_block='GCN', disable_initialization=False,
                  hidden_dim=None, num_layers=None, GAT_hidden_dims=None, GAT_heads=None, GAT_concats=None, dropout=0.25, **kwargs):
         """
         :param input_dim: int, input feature dimension
@@ -28,10 +28,14 @@ class HomogeneousNeuralTreeNetwork(HomogeneousNetwork):
         """
         super(HomogeneousNeuralTreeNetwork, self).__init__(input_dim, output_dim, output_dim_dict, conv_block, hidden_dim, 
                                                            num_layers, GAT_hidden_dims, GAT_heads, GAT_concats, dropout, **kwargs)
-        assert conv_block in ['GCN', 'GraphSAGE', 'GAT', 'GAT_edge']
+        assert conv_block in ['GCN', 'GraphSAGE', 'GAT', 'GAT_edge', 'GIN']
 
         # initialize clique features -- keep dimension the same
-        self.pre_mp = pyg_nn.GATConv(input_dim, input_dim, heads=1, concat=False, dropout=0.0, add_self_loops=False)
+        if disable_initialization:
+            self.pre_mp = None
+            print("diable initialization")
+        else:
+            self.pre_mp = pyg_nn.GATConv(input_dim, input_dim, heads=1, concat=False, dropout=0.0, add_self_loops=False)
 
         # post message passing pooling
         self.post_mp_pool = LeafPool(aggr='mean')
@@ -41,7 +45,8 @@ class HomogeneousNeuralTreeNetwork(HomogeneousNetwork):
             data.x, data.edge_index, data.init_edge_index, data.pool_edge_index, data.room_mask
 
         # initialize clique nodes
-        x = self.pre_mp(x, edge_index=init_edge_index)
+        if self.pre_mp is not None:
+            x = self.pre_mp(x, edge_index=init_edge_index)
 
         # x = F.dropout(x, p=self.dropout, training=self.training)
         for i in range(self.num_layers):
