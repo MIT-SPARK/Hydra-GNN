@@ -50,7 +50,7 @@ class HomogeneousNetwork(nn.Module):
         elif self.conv_block == 'GAT_edge':
             self.convs = build_GAT_conv_layers(input_dim, GAT_hidden_dims_with_last_layer, GAT_heads,
                 GAT_concats, dropout=dropout, edge_dim=3, add_self_loop=True, fill_value=torch.zeros(3, dtype=torch.float64))
-        else:  # GAT dimensions are different than others
+        else:
             self.convs.append(build_conv_layer(self.conv_block, input_dim, hidden_dim))
             for _ in range(1, self.num_layers - 1):
                 self.convs.append(build_conv_layer(self.conv_block, hidden_dim, hidden_dim))
