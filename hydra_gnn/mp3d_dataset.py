@@ -14,7 +14,7 @@ EDGE_TYPES = [('objects', 'objects_to_objects', 'objects'),
               ('rooms', 'rooms_to_objects', 'objects')]
 
 
-def heterogeneous_data_to_homogeneous(torch_data: HeteroData):
+def heterogeneous_data_to_homogeneous(torch_data: HeteroData, removed_edge_type=None):
     """
     Helper function to convert a pyg data from HeteroData to (homogeneous) Data. 
     The number of node features will be the maximum num of node features across all node types.
@@ -28,7 +28,21 @@ def heterogeneous_data_to_homogeneous(torch_data: HeteroData):
         torch_data[node_type].x = torch.nn.functional.pad(torch_data[node_type].x, \
             (0, num_node_features - torch_data[node_type].x.shape[1], 0, 0), mode='constant', value=0)
     node_types = list(torch_data.x_dict.keys())
-    torch_data = torch_data.to_homogeneous(add_edge_type=False)
+
+    if removed_edge_type is None:
+        torch_data = torch_data.to_homogeneous(add_edge_type=False)
+        return torch_data, node_types
+    else:
+        removed_edge_index = list(torch_data.edge_index_dict.keys()).index(removed_edge_type)
+        torch_data = torch_data.to_homogeneous(add_edge_type=True)
+
+    # remove specified edge type
+    edge_mask = (torch_data.edge_type != removed_edge_index)
+    torch_data.edge_index = torch_data.edge_index[:, edge_mask]
+    torch_data.edge_type = torch_data.edge_type[edge_mask]
+    if 'edge_attr' in torch_data:
+        torch_data.edge_attr = torch_data.edge_attr[edge_mask]
+
     return torch_data, node_types
 
 

@@ -1,4 +1,4 @@
-from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, EDGE_TYPES, heterogeneous_htree_to_homogeneous
+from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, EDGE_TYPES, heterogeneous_data_to_homogeneous, heterogeneous_htree_to_homogeneous
 from hydra_gnn.preprocess_dsgs import get_spark_dsg
 from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch
 import os.path
@@ -201,6 +201,12 @@ class Stanford3DSG_data(Hydra_mp3d_data):
             # training label y is the same as label
             self._torch_data.y = self._torch_data.label.long()
             # delattr(self._torch_data, 'label')
+    
+    def to_homogeneous(self, removed_edge_type=('rooms', 'rooms_to_objects', 'objects')):
+        if isinstance(self._torch_data, HeteroData):
+            self._torch_data, node_types = heterogeneous_data_to_homogeneous(self._torch_data, 
+                                                                             removed_edge_type=removed_edge_type)
+            self._torch_data.room_mask = (self._torch_data.node_type == node_types.index('rooms'))
     
     def num_room_labels(self):
         return max(self._room_semantic_dict.values()) + 1
