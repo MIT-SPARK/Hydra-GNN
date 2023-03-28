@@ -306,9 +306,10 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
 
 class Hydra_mp3d_dataset(torch.utils.data.Dataset):
-    def __init__(self, split):
+    def __init__(self, split, remove_short_trajectories=False):
         assert split in ('train', 'val', 'test'), "Invalid data split."
         self.split = split
+        self._remove_short_trajectories = remove_short_trajectories
         self._data_list = []
 
     def __len__(self):
@@ -340,7 +341,24 @@ class Hydra_mp3d_dataset(torch.utils.data.Dataset):
         if len(self._data_list) > 0:
             assert data.is_heterogeneous() == \
                 self._data_list[-1].is_heterogeneous(), "Invalid torch data type."
-        self._data_list.append(data)
+        
+        if not self._remove_short_trajectories:
+            self._data_list.append(data)
+        else:
+            data_info_dict = data.get_data_info()
+            scene_id, trajectory_id, num_frames = \
+                data_info_dict['scene_id'], data_info_dict['trajectory_id'], data_info_dict['num_frames']
+            # find saved data that has the same scene_id and trajectory_id
+            index = next((i for i in range(len(self._data_list)) if \
+                          self._data_list[i].get_data_info()['scene_id']==scene_id \
+                            and self._data_list[i].get_data_info()['trajectory_id']==trajectory_id), None)
+            # add input data to self._data_list if no data from this trajectory has been added
+            if index is None:
+                self._data_list.append(data)
+            # update self._data_list if the input data has more frames than existing one
+            elif int(num_frames) > int(self._data_list[index].get_data_info()['num_frames']):
+                self._data_list[index] = data
+
 
     def clear_dataset(self):
         self._data_list = []
