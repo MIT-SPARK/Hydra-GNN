@@ -13,7 +13,7 @@ from torch_geometric.utils import to_networkx
 
 import sys
 sys.path.append("../")
-from datasets.mp3d import MP3D, extract_room_graph
+from datasets.mp3d import MP3D, extract_room_graph, MP3Dnew
 
 
 def analyze_rooms(dset, save_file='./data/room_analysis_all.pkl'):
@@ -122,8 +122,11 @@ if __name__ == "__main__":
     # usage
     # python -W ignore rooms.py
 
-    dset = MP3D(complete=True)
-    analyze_rooms(dset, save_file='./data/mp3d_room_analysis_complete.pkl')
+    # dset = MP3D(complete=True)
+    # analyze_rooms(dset, save_file='./data/mp3d_room_analysis_complete.pkl')
+    #
+    # dset = MP3D(complete=False)
+    # analyze_rooms(dset, save_file='./data/mp3d_room_analysis_trajectory.pkl')
 
-    dset = MP3D(complete=False)
-    analyze_rooms(dset, save_file='./data/mp3d_room_analysis_trajectory.pkl')
+    dset = MP3Dnew()
+    analyze_rooms(dset, save_file='./data/mp3dnew_rooms.pkl')

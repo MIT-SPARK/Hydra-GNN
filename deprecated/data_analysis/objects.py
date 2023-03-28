@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 import sys
 sys.path.append("../")
-from datasets.mp3d import MP3D, extract_object_graph
+from datasets.mp3d import MP3D, extract_object_graph, MP3Dnew
 
 
 def analyze_objects(dset, save_file='./data/objects_analysis_all.pkl'):
@@ -80,8 +80,11 @@ if __name__ == "__main__":
     # usage
     # python -W ignore objects.py
 
-    dset = MP3D(complete=True)
-    analyze_objects(dset, save_file='./data/mp3d_object_analysis_complete.pkl')
+    # dset = MP3D(complete=True)
+    # analyze_objects(dset, save_file='./data/mp3d_object_analysis_complete.pkl')
+    #
+    # dset = MP3D(complete=False)
+    # analyze_objects(dset, save_file='./data/mp3d_object_analysis_trajectory.pkl')
 
-    dset = MP3D(complete=False)
-    analyze_objects(dset, save_file='./data/mp3d_object_analysis_trajectory.pkl')
+    dset = MP3Dnew()
+    analyze_objects(dset, save_file='./data/mp3dnew_objects.pkl')
