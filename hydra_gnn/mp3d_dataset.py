@@ -185,6 +185,15 @@ class Hydra_mp3d_data:
             convert_label_to_y(self._torch_data, object_synonyms=object_synonyms,
                 room_synonyms=room_synonyms)
 
+    def remove_last_features(self, dim):
+        if self.is_heterogeneous():
+            for node_type in self._torch_data.x_dict:
+                if self._torch_data[node_type].num_node_features >= dim:
+                    self._torch_data[node_type].x = self._torch_data[node_type].x[:, :-dim]
+        else:
+            if self._torch_data.num_node_features >= dim:
+                self._torch_data.x = self._torch_data.x[:, :-dim]
+
     def compute_relative_pos(self):
         """remove first three elements (3d pos) in x for each node and fill edge feature with relative pos"""
         if self._torch_data.edge_attr_dict:
