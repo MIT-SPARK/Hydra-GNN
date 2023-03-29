@@ -2,52 +2,92 @@
 """Run inference on received scene graphs."""
 import hydra_gnn.mp3d_dataset
 import spark_dsg as dsg
-import pandas as pd
 import numpy as np
-import torch_geometric
-import gensim.models
+import functools
 import pathlib
 import pickle
 import torch
 import click
 import yaml
+from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data
+from hydra_gnn.models import (
+    HomogeneousNetwork,
+    HeterogeneousNetwork,
+    HomogeneousNeuralTreeNetwork,
+    HeterogeneousNeuralTreeNetwork,
+)
+import torch_geometric
+from hydra_gnn.preprocess_dsgs import dsg_node_converter
 
 
 DataConverter = hydra_gnn.mp3d_dataset.Hydra_mp3d_data
 HtreeDataConverter = hydra_gnn.mp3d_dataset.Hydra_mp3d_htree_data
 
-DEFAULT_LAYERS = (dsg.DsgLayers.OBJECTS, dsg.DsgLayers.ROOMS, dsg.DsgLayers.BUILDINGS)
+
+def get_label_embedding_path(typology_path):
+    """Get name for label embedding file."""
+    typology_path = pathlib.Path(typology_path).expanduser().absolute()
+    return pathlib.Path(__file__).absolute().parent / f".{typology_path.stem}.pkl"
+
+
+def get_label_conversion(word2vec, typology_path, use_word2vec=True):
+    if not use_word2vec:
+        return _empty_feature
+
+    pkl_path = get_label_embedding_path(typology_path)
+    if not pkl_path.exists():
+        dump_word2vec(word2vec, typology_path)
+
+    with pkl_path.open("rb") as fin:
+        embedding_map = pickle.load(fin)
+
+    def _label_embedding(embedding_map, i):
+        return embedding_map.get(i, np.zeros(300))
+
+    return functools.partial(_label_embedding, embedding_map)
+
+
+def dump_word2vec(word2vec, typology_path):
+    """Dump word2vec embeddings for a typology file."""
+    click.secho(f"generating w2v embedding for {typology_path}", fg="green")
+
+    import gensim.models
+
+    word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(
+        word2vec, binary=True
+    )
+
+    typology_path = pathlib.Path(typology_path).expanduser().absolute()
+    with typology_path.open("r") as fin:
+        config = yaml.safe_load(fin.read())
+
+    label_name_map = {x["label"]: x["name"] for x in config["label_names"]}
+    embedding_map = {
+        x: np.mean([word2vec_model[s] for s in n.split("_") if s != "of"], axis=0)
+        for x, n in label_name_map.items()
+    }
+
+    pkl_path = get_label_embedding_path(typology_path)
+    with pkl_path.open("wb") as fout:
+        pickle.dump(embedding_map, fout)
 
 
 class GnnModel:
     """Class to hold stuff regarding inference."""
 
-    def __init__(self, model_file, word2vec_file, config_file, load_word2vec=True):
+    def __init__(self, model_file, config_file, device):
         """Load everything."""
         model_path = pathlib.Path(model_file).expanduser().absolute()
         with model_path.open("rb") as fin:
             self.model = pickle.load(fin)
 
-        word2vec_path = pathlib.Path(word2vec_file).expanduser().absolute()
-        if load_word2vec:
-            word2vec = _load_word2vec(word2vec_path)
-        else:
-            word2vec = {}
-
         config_path = pathlib.Path(config_file).expanduser().absolute()
         with config_path.open("r") as fin:
             self.config = yaml.load(fin.read(), Loader=yaml.SafeLoader)
 
-        self.object_labels = [x for _, x in self.config["object_labels"].items()]
-        self.object_embeddings = {
-            idx: _get_embedding(word2vec, label)
-            for idx, label in enumerate(self.object_labels)
-        }
-
-        self.building_labels = sorted(self.config["building_labels"])
         self.room_labels = sorted(self.config["room_labels"])
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.model.to(self.device)
 
     def infer(self, G):
@@ -78,15 +118,14 @@ def main():
     pass
 
 
-@main.command()
-@click.argument("server")
+@main.command(name="server")
 @click.argument("word2vec-file")
 @click.argument("config")
 @click.option("--recv-url", "-r", default="tcp://127.0.0.1:8001")
 @click.option("--send-url", "-s", default="tcp://127.0.0.1:8002")
 @click.option("--num-threads", "-t", default=2)
 @click.option("--poll-time-ms", default=10)
-def run(network, word2vec_file, config, recv_url, send_url, num_threads, poll_time_ms):
+def run(word2vec_file, config, recv_url, send_url, num_threads, poll_time_ms):
     """Start an inference server for a specific model checkpoint."""
     model = GnnModel(network, word2vec_file, config)
 
@@ -109,6 +148,116 @@ def run(network, word2vec_file, config, recv_url, send_url, num_threads, poll_ti
             G.add_node(dsg.DsgLayers.ROOMS, room_id.value, attrs)
 
         sender.send(G)
+
+
+def _invalid_room(room):
+    return not (len(room.children()) > 1 or room.has_siblings())
+
+
+def _load_model(model_path):
+    param_path = model_path / "model.yaml"
+    weight_path = model_path / "model_weights.pth"
+
+    with param_path.open("r") as input_file:
+        model_param = yaml.safe_load(input_file)
+
+    network_type, graph_type = model_param["network_type"], model_param["graph_type"]
+    click.secho(f"network type: {network_type}", fg="green")
+    click.secho(f"graph type: {graph_type}", fg="green")
+    click.secho(f"model hyper params: {model_param['network_params']}", fg="green")
+
+    if model_param["graph_type"] == "homogeneous":
+        if network_type == "baseline":
+            model = HomogeneousNetwork(**model_param["network_params"])
+        else:
+            model = HomogeneousNeuralTreeNetwork(**model_param["network_params"])
+    else:
+        if network_type == "baseline":
+            model = HeterogeneousNetwork(**model_param["network_params"])
+        else:
+            model = HeterogeneousNeuralTreeNetwork(**model_param["network_params"])
+
+    model.load_state_dict(torch.load(weight_path))
+    return model, network_type == "baseline"
+
+
+def _get_device():
+    return torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+
+
+def _empty_feature(x):
+    return np.zeros(0)
+
+
+@main.command(name="test")
+@click.argument("model_path", type=click.Path(exists=True))
+@click.option("--use-word2vec", is_flag=True)
+def test(model_path, use_word2vec):
+    device = _get_device()
+    model_path = pathlib.Path(model_path).expanduser().absolute()
+    model, is_baseline = _load_model(model_path)
+    model.to(device)
+    model.eval()
+
+    # dsg construction/conversion params
+    threshold_near = 1.5
+    max_near = 2.0
+    max_on = 0.2
+
+    if is_baseline:
+        data = Hydra_mp3d_data(scene_id=0, trajectory_id=0, num_frames=0)
+    else:
+        data = Hydra_mp3d_htree_data(scene_id=0, trajectory_id=0, num_frames=0)
+
+    G_ro = data.get_room_object_dsg()
+    N_objects = G_ro.get_layer(dsg.DsgLayers.OBJECTS).num_nodes()
+    N_rooms = G_ro.get_layer(dsg.DsgLayers.ROOMS).num_nodes()
+    if N_rooms == 0 or N_objects == 0:
+        raise RuntimeError("Invalid graph: rooms={N_rooms}, objects={N_objects}")
+
+    for room in G_ro.get_layer(dsg.DsgLayers.ROOMS).nodes:
+        if _invalid_room(room):
+            room.attributes.semantic_label = ord("\x15")
+
+    data.add_object_edges(
+        threshold_near=threshold_near, max_near=max_near, max_on=max_on
+    )
+    data.compute_torch_data(
+        use_heterogeneous=True,
+        node_converter=dsg_node_converter(object_feature_converter, _empty_feature),
+    )
+    data.clear_dsg()  # remove hydra dsg
+
+    if model_param["network_params"]["conv_block"] == "GAT_edge":
+        data.compute_relative_pos()
+    if graph_type == "homogeneous":
+        data.to_homogeneous()
+
+    # get PyG data
+    data = data.get_torch_data()
+
+    with torch.no_grad():
+        pred = model(data.to(device)).argmax(dim=1)
+        if graph_type == "homogeneous":
+            label = data.y[data.room_mask]
+        else:
+            if is_baseline:
+                label = data["rooms"].y
+            else:
+                label = data["room_virtual"].y
+
+        mask = label != 25  # ignore label 25, which is the unknown/filtered label
+        pred = pred[mask]
+        label = label[mask]
+    print(f"Predicted room labels: {pred}")
+    print(f"Ground truth room labels: {label}")
+
+
+@main.command(name="generate")
+@click.argument("word2vec", type=click.Path(exists=True))
+@click.argument("typology_path", type=click.Path(exists=True))
+def generate_word2vec_map(word2vec, typology_path):
+    dump_word2vec(word2vec, typology_path)
 
 
 if __name__ == "__main__":
