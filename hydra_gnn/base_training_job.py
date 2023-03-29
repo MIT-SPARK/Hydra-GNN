@@ -91,6 +91,9 @@ class BaseTrainingJob:
             else:
                 return HeterogeneousNeuralTreeNetwork(**self._training_params['network_params'])
     
+    def get_network_params(self):
+        return self._training_params['network_params']
+
     def train_job_type(self):
         return f"{self._graph_type} {self._network_type}"
 
@@ -118,7 +121,7 @@ class BaseTrainingJob:
         else:
             device = torch.device("cuda:0")
         self._net.to(device)
-        if device == "cpu":
+        if device.type == "cpu":
             print("Warning: not training on GPU!")
         else:
             print(f"Training on GPU {device.index}.")
