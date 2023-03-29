@@ -1,7 +1,11 @@
 import importlib
 import numpy as np
-import torch
-from torch_geometric.data import (Data, HeteroData)
+try:
+    import torch
+    from torch_geometric.data import (Data, HeteroData)
+except ImportError:
+    print("Failed to import torch!")
+
 
 OBJECT_LABELS = [
     3,  # chair
