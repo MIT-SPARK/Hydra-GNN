@@ -36,6 +36,8 @@ if __name__ == "__main__":
                         help='training and validation ratio')
     parser.add_argument('--same_val_test', action='store_true', 
                         help="use the same scenes for validation and testing (trajctory 0-1 for validation, 2-4 for testing)")
+    parser.add_argument('--remove_word2vec', action='store_true', 
+                        help="remove word2vec features from node features (assuming it is at the end of the feature vector)")
     args = parser.parse_args()
 
     print(f"cuda available: {torch.cuda.is_available()}")
@@ -71,7 +73,7 @@ if __name__ == "__main__":
         print("Regenerating val/test split using trajectories -- 0-1 for training and 2-4 for testing.")
 
     # create data lists
-    dataset_dict = {'train': Hydra_mp3d_dataset('train'),
+    dataset_dict = {'train': Hydra_mp3d_dataset('train', remove_short_trajectories=False),
                     'val': Hydra_mp3d_dataset('val'),
                     'test': Hydra_mp3d_dataset('test')}
     with open(dataset_path, 'rb') as input_file:
@@ -80,6 +82,8 @@ if __name__ == "__main__":
         [data.compute_relative_pos() for data in data_list]
     if config['data']['type'] == 'homogeneous':
         [data.to_homogeneous() for data in data_list]
+    if args.remove_word2vec:
+        [data.remove_last_features(300) for data in data_list]
     
     if args.same_val_test:
         for data in data_list:
