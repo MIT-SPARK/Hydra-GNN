@@ -15,42 +15,41 @@ import sys
 sys.path.append(str(pathlib.Path(__file__).absolute().parent.parent))
 from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data  # noqa: E402
 import hydra_gnn.models  # noqa: E402
-from hydra_gnn.preprocess_dsgs import dsg_node_converter  # noqa: E402
+from hydra_gnn.preprocess_dsgs import dsg_node_converter, _get_label_dict  # noqa: E402
 
-
-ROOM_LABELS = [
-    "bathroom",
-    "bedroom",
-    "closet",
-    "dinig room",
-    "entryway",
-    "family room",
-    "garage",
-    "hallway",
-    "library",
-    "laundryroom",
-    "kitchen",
-    "living room",
-    "conference room",
-    "lounge",
-    "office",
-    "porch",
-    "game room",
-    "staircase",
-    "toilet",
-    "utility room",
-    "theater",
-    "gym",
-    "outdoor",
-    "balcony",
-    "unknown",
-    "bar",
-    "classroom",
-    "dining boot",
-    "spa",
-    "junk",
-    "unknown",
-]
+ROOM_NAME_MAP = {
+    "a": "bathroom",
+    "b": "bedroom",
+    "c": "closet",
+    "d": "dining room",
+    "e": "lobby",
+    "f": "family room",
+    "g": "garage",
+    "h": "hallway",
+    "i": "library",
+    "j": "laundry room",
+    "k": "kitchen",
+    "l": "living room",
+    "m": "conference room",
+    "n": "lounge",
+    "o": "office",
+    "p": "porch",
+    "r": "game room",
+    "s": "stairwell",
+    "t": "toilet",
+    "u": "utility room",
+    "v": "theater",
+    "w": "gym",
+    "x": "outdoor",
+    "y": "balcony",
+    "z": "other room",
+    "B": "bar",
+    "C": "classroom",
+    "D": "dining booth",
+    "S": "spa",
+    "Z": "junk",
+    "\x15": "unknown",
+}
 
 
 @dataclass
@@ -172,13 +171,21 @@ class GnnModel:
         self.threshold_near = 1.5
         self.max_near = 2.0
         self.max_on = 0.2
+        self.room_synonyms = [("a", "t"), ("z", "Z", "x", "p", "\x15")]
+        room_label_dict = _get_label_dict(
+            [x for x in ROOM_NAME_MAP], self.room_synonyms
+        )
+        self.name_map = {
+            idx: ROOM_NAME_MAP[name] for name, idx in room_label_dict.items()
+        }
+        click.secho(f"Room label conversion: {self.name_map}", fg="green")
 
     def _check_graph(self, data):
         G_ro = data.get_room_object_dsg()
         N_objects = G_ro.get_layer(dsg.DsgLayers.OBJECTS).num_nodes()
         N_rooms = G_ro.get_layer(dsg.DsgLayers.ROOMS).num_nodes()
         if N_rooms == 0 or N_objects == 0:
-            print("Invalid graph: rooms={N_rooms}, objects={N_objects}")
+            click.secho("Invalid graph: rooms={N_rooms}, objects={N_objects}", fg="red")
             return False
 
         return True
@@ -221,19 +228,28 @@ class GnnModel:
 
     def infer(self, G):
         """Run inference on a given scene graph."""
+        tic = time.perf_counter_ns()
         data, invalid_nodes = self.convert_graph(G)
+        toc = time.perf_counter_ns()
+        setup_elapsed = (toc - tic) * 1.0e-6
+
+        tic = time.perf_counter_ns()
         with torch.no_grad():
             pred = self.model(data.to(self.device)).argmax(dim=1).cpu()
-            print(f"Predicted room labels: {pred}")
+        toc = time.perf_counter_ns()
+        infer_elapsed = (toc - tic) * 1.0e-6
 
-        # pred_room_labels = [self.room_labels[x] for x in pred]
+        click.secho(
+            f"runtime: setup={setup_elapsed}[ms], inference={infer_elapsed}[ms]"
+        )
+
+        pred = [self.name_map.get(int(x), "unknown") for x in pred]
         room_ids = (
             data["rooms"].node_ids.cpu() if not self.model_info.homogeneous else None
         )
         room_ids = room_ids.numpy()
         room_ids = room_ids.astype(np.uint64)
         pred_room_map = {room_ids[idx]: label for idx, label in enumerate(pred)}
-        print(f"rooms: {pred_room_map}")
         return pred_room_map
 
 
@@ -289,7 +305,6 @@ def run(
         if not receiver.recv(poll_time_ms):
             continue
 
-        click.secho("received graph!")
         predicted_labels = model.infer(receiver.graph)
 
         G = dsg.DynamicSceneGraph()
