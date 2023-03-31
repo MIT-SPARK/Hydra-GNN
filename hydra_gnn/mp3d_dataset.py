@@ -100,10 +100,10 @@ class Hydra_mp3d_data:
         self._file_path = file_path
         
         # extract complete dsg (for book-keeping) and room-object graph
-        dsg = get_spark_dsg()
+        dsg, dsg_mp3d = get_spark_dsg(return_mp3d=True)
         self._G = dsg.DynamicSceneGraph.load(file_path)
         if expand_rooms:
-            self._G = dsg.mp3d.expand_rooms(self._G)
+            self._G = dsg_mp3d.expand_rooms(self._G)
         dsg.add_bounding_boxes_to_layer(self._G, dsg.DsgLayers.ROOMS)
         self._G_ro = get_room_object_dsg(self._G, verbose=False)
 
@@ -115,14 +115,14 @@ class Hydra_mp3d_data:
 
     def add_dsg_room_labels(self, mp3d_info, angle_deg=-90, room_removal_func=None, min_iou_threshold=0.5, repartition_rooms=False):
         """add room labels to room-object dsg using ground-truth mp3d house segmentation"""
-        dsg = get_spark_dsg()
+        dsg, dsg_mp3d = get_spark_dsg(return_mp3d=True)
         if repartition_rooms:   # repartition rooms (i.e. replace room nodes) with ground-truth room segmentation 
-            self._G = dsg.mp3d.repartition_rooms(self._G, mp3d_info, angle_deg=angle_deg, \
+            self._G = dsg_mp3d.repartition_rooms(self._G, mp3d_info, angle_deg=angle_deg, \
                 min_iou_threshold=min_iou_threshold)
             dsg.add_bounding_boxes_to_layer(self._G, dsg.DsgLayers.ROOMS)
             self._G_ro = get_room_object_dsg(self._G, verbose=False)
         else:
-            dsg.mp3d.add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg, \
+            dsg_mp3d.add_gt_room_label(self._G_ro, mp3d_info, angle_deg=angle_deg, \
                 min_iou_threshold=min_iou_threshold, use_hydra_polygon=False)
 
         if room_removal_func is not None:    

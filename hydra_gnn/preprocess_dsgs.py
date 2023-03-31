@@ -73,12 +73,16 @@ ROOM_LABELS = [
 ]
 
 
-def get_spark_dsg():
+def get_spark_dsg(return_mp3d=False):
     try:
         dsg = importlib.import_module('spark_dsg')
+        if return_mp3d:
+            dsg_mp3d = importlib.import_module('spark_dsg.mp3d')
+            return dsg, dsg_mp3d
+        else:
+            return dsg
     except ImportError:
         raise ValueError("spark_dsg not found.")
-    return dsg
 
 
 def _is_on(G, n1, n2, max_on):
