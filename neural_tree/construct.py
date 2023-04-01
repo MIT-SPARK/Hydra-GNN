@@ -39,7 +39,10 @@ def torch_dsg_to_nx(dsg_torch):
     _g = dsg_torch.to_homogeneous()
     node_type = dsg_torch.node_types
 
-    dsg_nx = to_networkx(_g, node_attrs=['x', 'pos', 'label', 'node_type']).to_undirected()
+    attr_keys = ['x', 'pos', 'label', 'node_type']
+    if "node_ids" in _g:
+        attr_keys.append("node_ids")
+    dsg_nx = to_networkx(_g, node_attrs=attr_keys).to_undirected()
 
     # change node_type from 0/1 to object/room
     for _, data in dsg_nx.nodes.items():
@@ -287,9 +290,18 @@ def add_virtual_nodes_to_htree(htree_nx):
         virtual_node_idx = node_data_dict['clique_has'] + idx_offset
 
         if virtual_node_idx not in htree_output.nodes:
-            htree_output.add_node(virtual_node_idx, x=node_data_dict['x'], pos=node_data_dict['pos'], \
-                label=node_data_dict['label'], node_type=node_data_dict['node_type']+'_virtual', \
-                    type='virtual', clique_has=node_data_dict['clique_has'])
+            kwargs = {
+                "x": node_data_dict["x"],
+                "pos": node_data_dict["pos"],
+                "label": node_data_dict["label"],
+                "node_type": f"{node_data_dict['node_type']}_virtual",
+                "type": "virtual",
+                "clique_has": node_data_dict["clique_has"],
+            }
+            if "node_ids" in node_data_dict:
+                kwargs["node_ids"] = node_data_dict["node_ids"]
+
+            htree_output.add_node(virtual_node_idx, **kwargs)
 
         htree_output.add_edge(leaf_idx, virtual_node_idx)
 
@@ -327,6 +339,7 @@ def nx_htree_to_torch(htree_nx, node_type_names=HTREE_NODE_TYPES+HTREE_VIRTUAL_N
     label_ = []
     node_type_ = []
     clique_has_ = []
+    node_ids_ = []
 
     read_pos_from = 'room_virtual' if 'room_virtual' in node_type_names else 'room'
     for i in range(htree_nx.number_of_nodes()):
@@ -343,11 +356,13 @@ def nx_htree_to_torch(htree_nx, node_type_names=HTREE_NODE_TYPES+HTREE_VIRTUAL_N
                 pos_.append(torch.zeros(3, dtype=dtype_float))
             x_.append(torch.hstack((pos_[-1], torch.tensor(data_dict['x'][3:], dtype=dtype_float))))
             label_.append(-1)
+            node_ids_.append(-1)
             clique_has_.append(-1)
         else:
             x_.append(torch.tensor(data_dict['x'], dtype=dtype_float))
             pos_.append(torch.tensor(data_dict['pos'], dtype=dtype_float))
             label_.append(data_dict['label'])
+            node_ids_.append(data_dict.get("node_ids", -1))
             clique_has_.append(data_dict['clique_has'])
 
     x_ = torch.vstack(x_)
@@ -355,6 +370,7 @@ def nx_htree_to_torch(htree_nx, node_type_names=HTREE_NODE_TYPES+HTREE_VIRTUAL_N
     label_ = torch.tensor(label_, dtype=dtype_int)
     node_type_ = torch.tensor(node_type_)
     clique_has_ = torch.tensor(clique_has_, dtype=dtype_int)
+    node_ids_ = torch.tensor(node_ids_, dtype=torch.int64)
 
     # edge types
     edges = list(htree_nx.edges)
@@ -373,7 +389,7 @@ def nx_htree_to_torch(htree_nx, node_type_names=HTREE_NODE_TYPES+HTREE_VIRTUAL_N
 
     # generate homogeneous graph
     htree_homogeneous = Data(x=x_, edge_index=edge_index, label=label_, pos=pos_, clique_has=clique_has_, \
-        node_type=node_type_, edge_type=edge_type_)
+        node_type=node_type_, edge_type=edge_type_, node_ids=node_ids_)
 
     # extracting the heterogeneous graph
     htree_torch = htree_homogeneous.to_heterogeneous(node_type=node_type_, edge_type=edge_type_, \

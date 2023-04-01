@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run inference on received scene graphs."""
 import spark_dsg as dsg
+import spark_dsg.mp3d
 import numpy as np
 import functools
 import pathlib
@@ -59,6 +60,7 @@ class ModelInfo:
     homogeneous: bool = False
     htree: bool = False
     relative_pos: bool = False
+    use_word2vec: bool = True
 
     @classmethod
     def from_yaml(cls, config):
@@ -66,7 +68,13 @@ class ModelInfo:
         homogeneous = config["graph_type"] == "homogeneous"
         htree = config["network_type"] != "baseline"
         relative_pos = config["network_params"]["conv_block"] == "GAT_edge"
-        return cls(homogeneous, htree, relative_pos)
+
+        if htree:
+            use_word2vec = config["network_params"]["input_dim_dict"]["object"] >= 300
+        else:
+            use_word2vec = config["network_params"]["input_dim_dict"]["objects"] >= 300
+
+        return cls(homogeneous, htree, relative_pos, use_word2vec)
 
     @property
     def model_class(self):
@@ -124,10 +132,14 @@ def _empty_feature(x):
     return np.zeros(0)
 
 
+def _zero_feature(x, dim=300):
+    return np.zeros(dim)
+
+
 def get_label_conversion(word2vec, typology_path, use_word2vec=True):
     """Get function to convert semantic labels to node features."""
     if not use_word2vec:
-        return _empty_feature
+        return lambda x: _zero_feature(x, dim=300)
 
     pkl_path = get_label_embedding_path(typology_path)
     if not pkl_path.exists():
@@ -142,12 +154,42 @@ def get_label_conversion(word2vec, typology_path, use_word2vec=True):
     return functools.partial(_label_embedding, embedding_map)
 
 
+class RoomLabelConverter:
+    """Converter between numeric labels and actual room labels."""
+
+    def __init__(self, name_map, synonyms=None, default="unknown"):
+        """Initialize relevant maps."""
+        if synonyms is None:
+            self.synonyms = [("a", "t"), ("z", "Z", "x", "p", "\x15")]
+        else:
+            self.synonyms = synonyms
+
+        self.default = default
+        self.char_map = _get_label_dict([x for x in name_map], self.synonyms)
+        self.label_map = {idx: name_map[name] for name, idx in self.char_map.items()}
+
+    def name_from_label(self, label):
+        """Get name from label."""
+        return self.label_map.get(label, self.default)
+
+    def name_from_char(self, char):
+        """Get name from character."""
+        label = self.char_map.get(char, self.default)
+        return self.name_from_label(label)
+
+    def __str__(self):
+        """Get fancy string representation of conversion."""
+        map_str = "Label Correspondence:\n"
+        for idx, name in self.label_map.items():
+            map_str += f"  - {idx} →  {name}\n"
+
+        return map_str
+
+
 class GnnModel:
     """Class to hold stuff regarding inference."""
 
-    def __init__(
-        self, model_path, word2vec_path, typology_path, device=None, use_word2vec=True
-    ):
+    def __init__(self, model_path, word2vec_path, typology_path, device=None):
         """Load everything."""
         param_path = model_path / "model.yaml"
         weight_path = model_path / "model_weights.pth"
@@ -161,9 +203,7 @@ class GnnModel:
 
         self.model = self.model_info.model_class(**model_param["network_params"])
         self.model.load_state_dict(torch.load(weight_path))
-        self.label_converter = get_label_conversion(
-            word2vec_path, typology_path, use_word2vec=use_word2vec
-        )
+        self.label_converter = get_label_conversion(word2vec_path, typology_path)
 
         self.device = device
         self.model.to(self.device)
@@ -171,14 +211,8 @@ class GnnModel:
         self.threshold_near = 1.5
         self.max_near = 2.0
         self.max_on = 0.2
-        self.room_synonyms = [("a", "t"), ("z", "Z", "x", "p", "\x15")]
-        room_label_dict = _get_label_dict(
-            [x for x in ROOM_NAME_MAP], self.room_synonyms
-        )
-        self.name_map = {
-            idx: ROOM_NAME_MAP[name] for name, idx in room_label_dict.items()
-        }
-        click.secho(f"Room label conversion: {self.name_map}", fg="green")
+        self.room_label_converter = RoomLabelConverter(ROOM_NAME_MAP)
+        click.secho(f"{self.room_label_converter}", fg="green")
 
     def _check_graph(self, data):
         G_ro = data.get_room_object_dsg()
@@ -215,7 +249,10 @@ class GnnModel:
         )
         data.compute_torch_data(
             use_heterogeneous=True,
-            node_converter=dsg_node_converter(self.label_converter, _empty_feature),
+            node_converter=dsg_node_converter(
+                self.label_converter,
+                _zero_feature if self.model_info.htree else _empty_feature,
+            ),
         )
 
         if self.model_info.relative_pos:
@@ -223,6 +260,9 @@ class GnnModel:
 
         if self.model_info.homogeneous:
             data.to_homogeneous()
+
+        if not self.model_info.use_word2vec:
+            data.remove_last_features(300)
 
         return data.get_torch_data(), invalid_nodes
 
@@ -243,11 +283,9 @@ class GnnModel:
             f"runtime: setup={setup_elapsed}[ms], inference={infer_elapsed}[ms]"
         )
 
-        pred = [self.name_map.get(int(x), "unknown") for x in pred]
-        room_ids = (
-            data["rooms"].node_ids.cpu() if not self.model_info.homogeneous else None
-        )
-        room_ids = room_ids.numpy()
+        pred = [self.room_label_converter.name_from_label(int(x)) for x in pred]
+        readout_layer = "rooms" if not self.model_info.htree else "room_virtual"
+        room_ids = data[readout_layer].node_ids.cpu().numpy()
         room_ids = room_ids.astype(np.uint64)
         pred_room_map = {room_ids[idx]: label for idx, label in enumerate(pred)}
         return pred_room_map
@@ -271,7 +309,6 @@ def _get_device():
 @click.option("-s", "--send-url", default="tcp://127.0.0.1:8002")
 @click.option("-t", "--num-threads", default=2)
 @click.option("--poll-time-ms", default=10)
-@click.option("-w", "--use-word2vec", is_flag=True)
 def run(
     model_path,
     word2vec_path,
@@ -280,7 +317,6 @@ def run(
     send_url,
     num_threads,
     poll_time_ms,
-    use_word2vec,
 ):
     """Start an inference server for a specific model checkpoint."""
     model_path = pathlib.Path(model_path).expanduser().absolute()
@@ -290,7 +326,6 @@ def run(
         word2vec_path,
         typology_path,
         device=device,
-        use_word2vec=use_word2vec,
     )
 
     click.secho(f"setting up sender @ {send_url}", fg="green")
@@ -321,7 +356,9 @@ def run(
 @click.option("--send-url", "-s", default="tcp://127.0.0.1:8001")
 @click.option("--recv-url", "-r", default="tcp://127.0.0.1:8002")
 @click.option("--poll-time-ms", default=10)
-def test(path_to_graph, send_url, recv_url, poll_time_ms):
+@click.option("--house-file", default=None)
+@click.option("-v", "--verbose", is_flag=True)
+def test(path_to_graph, send_url, recv_url, poll_time_ms, house_file, verbose):
     """Run a test inference using a scene graph from a file."""
     G = dsg.DynamicSceneGraph.load(path_to_graph)
 
@@ -337,12 +374,25 @@ def test(path_to_graph, send_url, recv_url, poll_time_ms):
     sender.send(G)
     click.secho("sent graph", fg="green")
 
+    if house_file is not None:
+        converter = RoomLabelConverter(ROOM_NAME_MAP)
+        mp3d_info = spark_dsg.mp3d.load_mp3d_info(house_file)
+        spark_dsg.mp3d.add_gt_room_label(
+            G, mp3d_info, use_hydra_polygon=True, verbose=verbose
+        )
+
+        click.echo("Ground-truth labels:")
+        for node in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
+            label = converter.name_from_char(chr(node.attributes.semantic_label))
+            click.echo(f"  - {node.id} →  {label}")
+
     while True:
         if not receiver.recv(poll_time_ms):
             continue
 
+        click.echo("Predicted labels:")
         for node in receiver.graph.get_layer(dsg.DsgLayers.ROOMS).nodes:
-            print(node.attributes.name)
+            click.echo(f"  - {node.id} →  {node.attributes.name}")
 
         break
 
