@@ -156,12 +156,14 @@ if __name__ == "__main__":
             training_epoch_list.append(info['num_epochs'])
             test_time_list.append(info['test_time'])
 
-            val_room_accuracy, val_object_accuracy = train_job.test(mask_name='val_mask', get_type_separated_accuracy=True)
-            test_room_accuracy, test_object_accuracy = train_job.test(mask_name='test_mask', get_type_separated_accuracy=True)
-            val_room_accuracy_list.append(val_room_accuracy * 100)
-            val_object_accuracy_list.append(val_object_accuracy * 100)
-            test_room_accuracy_list.append(test_room_accuracy * 100)
-            test_object_accuracy_list.append(test_object_accuracy * 100)        
+            # save type separated accuracy for single experiment
+            if args.single_experiment:
+                val_room_accuracy, val_object_accuracy = train_job.test(mask_name='val_mask', get_type_separated_accuracy=True)
+                test_room_accuracy, test_object_accuracy = train_job.test(mask_name='test_mask', get_type_separated_accuracy=True)
+                val_room_accuracy_list.append(val_room_accuracy * 100)
+                val_object_accuracy_list.append(val_object_accuracy * 100)
+                test_room_accuracy_list.append(test_room_accuracy * 100)
+                test_object_accuracy_list.append(test_object_accuracy * 100)        
 
         # save param and accuracy
         output_data_list = [f"experiment_{experiment_i}"] + param_list + val_accuracy_list + test_accuracy_list + \
