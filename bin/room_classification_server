@@ -219,7 +219,9 @@ class GnnModel:
         N_objects = G_ro.get_layer(dsg.DsgLayers.OBJECTS).num_nodes()
         N_rooms = G_ro.get_layer(dsg.DsgLayers.ROOMS).num_nodes()
         if N_rooms == 0 or N_objects == 0:
-            click.secho("Invalid graph: rooms={N_rooms}, objects={N_objects}", fg="red")
+            click.secho(
+                f"Invalid graph: rooms={N_rooms}, objects={N_objects}", fg="red"
+            )
             return False
 
         return True
@@ -233,6 +235,9 @@ class GnnModel:
 
     def convert_graph(self, G):
         """Convert dsg to pytorch."""
+        for node in G.get_layer(dsg.DsgLayers.ROOMS).nodes:
+            node.attributes.semantic_label = 21
+
         if self.model_info.htree:
             data = Hydra_mp3d_htree_data(graph=G)
         else:
@@ -269,9 +274,13 @@ class GnnModel:
     def infer(self, G):
         """Run inference on a given scene graph."""
         tic = time.perf_counter_ns()
-        data, invalid_nodes = self.convert_graph(G)
+        results = self.convert_graph(G)
         toc = time.perf_counter_ns()
         setup_elapsed = (toc - tic) * 1.0e-6
+        if results is None:
+            return None
+
+        data, invalid_nodes = results
 
         tic = time.perf_counter_ns()
         with torch.no_grad():
@@ -343,10 +352,11 @@ def run(
         predicted_labels = model.infer(receiver.graph)
 
         G = dsg.DynamicSceneGraph()
-        for room_id, label in predicted_labels.items():
-            attrs = dsg.RoomNodeAttributes()
-            attrs.name = f"{dsg.NodeSymbol(room_id)}: {label}"
-            G.add_node(dsg.DsgLayers.ROOMS, room_id, attrs)
+        if predicted_labels:
+            for room_id, label in predicted_labels.items():
+                attrs = dsg.RoomNodeAttributes()
+                attrs.name = f"{dsg.NodeSymbol(room_id)}: {label}"
+                G.add_node(dsg.DsgLayers.ROOMS, room_id, attrs)
 
         sender.send(G)
 
