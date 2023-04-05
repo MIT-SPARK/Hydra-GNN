@@ -18,11 +18,13 @@ from pprint import pprint
 
 
 # parameter sweep setup
-GAT_hidden_dims = plist('GAT_hidden_dims', [[32, 32], [64, 64], [32, 32, 32], [64, 64, 64]])
+GAT_hidden_dims = plist('GAT_hidden_dims', [[32, 32], [64, 64]])
+GAT_head = plist('GAT_head', [3])    # same number of head in each conv layer
+GAT_concat = plist('GAT_concat', [True, False])    # same concate in each conv layer except the last (always False)
 dropout = plist('dropout', [0.4])
-lr = plist('lr', [0.002])
-weight_decay = plist('weight_decay', [0.0])
-param_dict_list = pgrid(lr, weight_decay, GAT_hidden_dims, dropout)
+lr = plist('lr', [0.001])
+weight_decay = plist('weight_decay', [0.0001, 0.001])
+param_dict_list = pgrid(lr, weight_decay, GAT_hidden_dims, GAT_head, GAT_concat, dropout)
 
 
 if __name__ == "__main__":
@@ -38,6 +40,8 @@ if __name__ == "__main__":
                         help="use the same scenes for validation and testing (trajctory 0-1 for validation, 2-4 for testing)")
     parser.add_argument('--remove_word2vec', action='store_true', 
                         help="remove word2vec features from node features (assuming it is at the end of the feature vector)")
+    parser.add_argument('--single_experiment', action='store_true',
+                        help="run single experiment using config file instead of parameter sweep")
     args = parser.parse_args()
 
     print(f"cuda available: {torch.cuda.is_available()}")
@@ -122,38 +126,50 @@ if __name__ == "__main__":
             ['test_' + str(i) for i in range(config['run_control']['num_runs'])] + \
                 ['avg num_epochs', 'avg training_time/ecpho (s)', 'avg test_time (s)'])
 
-    # update parameter
-    num_param_set = len(param_dict_list)
-    experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
+    # run experiment
+    if args.single_experiment:
+        experiment_id_list = [0]
+    else:
+        num_param_set = len(param_dict_list)
+        experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
+
     for experiment_i in experiment_id_list:
-        print(f"\nExperiment {experiment_i+1} / {len(param_dict_list)}")
-        param_dict = param_dict_list[experiment_i]
-        
-        if config['network']['conv_block'][:3] == 'GAT':
-            # todo: this is for temporary GAT tuning with single attention head
-            param_dict['GAT_heads'] = len(param_dict['GAT_hidden_dims']) * [1] + [1]
-            param_dict['GAT_concats'] = len(param_dict['GAT_hidden_dims']) * [False] + [False]
+        if args.single_experiment:
+            print(f"\nUse all parameters in config: {args.config_file}")
+            experiment_output_dir_i = os.path.join(output_dir, "experiment")
+            config_output_path_i = os.path.join(output_dir, "config.yaml")
+            accuracy_file_path = os.path.join(output_dir, "accuracy.csv")
+            param_list = ['-'] * len(log_params)
+        else:
+            print(f"\nExperiment {experiment_i+1} / {len(param_dict_list)}")
+            experiment_output_dir_i = os.path.join(output_dir, f"experiment_{experiment_i}")
+            config_output_path_i = os.path.join(experiment_output_dir_i, 'config.yaml')
+            accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
+            param_dict = param_dict_list[experiment_i]
+            param_list = [param_dict[key] for key in log_params]
+            if config['network']['conv_block'][:3] == 'GAT':
+                # todo: this is for temporary GAT tuning
+                param_dict['GAT_heads'] = len(param_dict['GAT_hidden_dims']) * [param_dict['GAT_head']] + [param_dict['GAT_head']]
+                param_dict['GAT_concats'] = len(param_dict['GAT_hidden_dims']) * [param_dict['GAT_concat']] + [False]
 
-            # check GAT params
-            if len(param_dict['GAT_heads']) != len(param_dict['GAT_hidden_dims']) + 1 or \
-                len(param_dict['GAT_concats']) != len(param_dict['GAT_hidden_dims']) + 1:
-                print('  Skip - invalid GAT param')
-                continue
+                # check GAT params
+                if len(param_dict['GAT_heads']) != len(param_dict['GAT_hidden_dims']) + 1 or \
+                    len(param_dict['GAT_concats']) != len(param_dict['GAT_hidden_dims']) + 1:
+                    print('  Skip - invalid GAT param')
+                    continue
+            update_existing_keys(config['network'], param_dict)
+            update_existing_keys(config['optimization'], param_dict)
+            pprint('config:')
+            pprint(config)
 
-        update_existing_keys(config['network'], param_dict)
-        update_existing_keys(config['optimization'], param_dict)
-        pprint('config:')
-        pprint(config)
-
-        # clean up output directory
-        experiment_output_dir_i = os.path.join(output_dir, f"experiment_{experiment_i}")
+        # clean up tensorboard output directory
         if os.path.exists(experiment_output_dir_i):
             shutil.rmtree(experiment_output_dir_i)
             print(f"Overwritting experiment output folder {experiment_output_dir_i}")
         os.mkdir(experiment_output_dir_i)
 
         # save config
-        with open(os.path.join(experiment_output_dir_i, 'config.yaml'), 'w') as output_file:
+        with open(config_output_path_i, 'w') as output_file:
             yaml.dump(config, output_file, default_flow_style=False)
 
         # run experiment
@@ -171,38 +187,39 @@ if __name__ == "__main__":
                                             early_stop_window=config['run_control']['early_stop_window'],
                                             gpu_index=gpu_index,
                                             verbose=True)
-            # log per label accuracy
-            train_accuracy, train_accuracy_matrix = \
-                train_job.test(DataLoader(train_job.get_dataset('train'), batch_size=4096), True)
-            val_accuracy, val_accuracy_matrix = \
-                train_job.test(DataLoader(train_job.get_dataset('val'), batch_size=4096), True)
-            test_accuracy, test_accuracy_matrix = \
-                train_job.test(DataLoader(train_job.get_dataset('test'), batch_size=4096), True)
-            assert abs(val_accuracy - best_acc[0]) < 0.001, f"{val_accuracy}, {best_acc[0]}"
-            assert abs(test_accuracy - best_acc[1]) < 0.001, f"{test_accuracy}, {best_acc[1]}"
-            # output_header = "num_labels[train],num_tp[train],num_fp[train],num_labels[val],num_tp[val],num_fp[val],num_labels[test],num_tp[test],num_fp[test]"
-            num_labels = train_accuracy_matrix.shape[1]
-            output_header = [f"{l}[train]" for l in range(num_labels)] + \
-                            [f"{l}[val]" for l in range(num_labels)] + \
-                            [f"{l}[test]" for l in range(num_labels)]
-            output_header = ','.join(output_header)
-            np.savetxt(f"{experiment_output_dir_i}/{j}/accuracy_matrix.csv", 
-                       np.concatenate((train_accuracy_matrix, val_accuracy_matrix, test_accuracy_matrix), axis=1),
-                       fmt='%i',
-                       delimiter=',', 
-                       comments='',
-                       header=output_header)
-
             val_accuracy_list.append(best_acc[0] * 100)
             test_accuracy_list.append(best_acc[1] * 100)
             training_time_list.append(info['training_time'])
             training_epoch_list.append(info['num_epochs'])
             test_time_list.append(info['test_time'])
 
+            # log per label accuracy for single experiment
+            if args.single_experiment:
+                train_accuracy, train_accuracy_matrix = \
+                    train_job.test(DataLoader(train_job.get_dataset('train'), batch_size=4096), True)
+                val_accuracy, val_accuracy_matrix = \
+                    train_job.test(DataLoader(train_job.get_dataset('val'), batch_size=4096), True)
+                test_accuracy, test_accuracy_matrix = \
+                    train_job.test(DataLoader(train_job.get_dataset('test'), batch_size=4096), True)
+                assert abs(val_accuracy - best_acc[0]) < 0.001, f"{val_accuracy}, {best_acc[0]}"
+                assert abs(test_accuracy - best_acc[1]) < 0.001, f"{test_accuracy}, {best_acc[1]}"
+                # output_header = "num_labels[train],num_tp[train],num_fp[train],num_labels[val],num_tp[val],num_fp[val],num_labels[test],num_tp[test],num_fp[test]"
+                num_labels = train_accuracy_matrix.shape[1]
+                output_header = [f"{l}[train]" for l in range(num_labels)] + \
+                                [f"{l}[val]" for l in range(num_labels)] + \
+                                [f"{l}[test]" for l in range(num_labels)]
+                output_header = ','.join(output_header)
+                np.savetxt(f"{experiment_output_dir_i}/{j}/accuracy_matrix.csv", 
+                        np.concatenate((train_accuracy_matrix, val_accuracy_matrix, test_accuracy_matrix), axis=1),
+                        fmt='%i',
+                        delimiter=',', 
+                        comments='',
+                        header=output_header)
+
         # save param and accuracy
-        accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
-        output_data_list = [f"experiment_{experiment_i}"] + [param_dict[key] for key in log_params] + \
-            val_accuracy_list + test_accuracy_list + \
-                [mean(training_epoch_list), sum(training_time_list) / sum(training_epoch_list), mean(test_time_list)]
+        output_data_list = [f"experiment_{experiment_i}"] + param_list + val_accuracy_list + test_accuracy_list + \
+            [mean(training_epoch_list), sum(training_time_list) / sum(training_epoch_list), mean(test_time_list)]
         df = pd.concat([df, pd.DataFrame(data=[output_data_list], columns = df.columns)])
+        if not args.single_experiment:
+            df["GAT_concat"] = df["GAT_concat"].astype(bool)
         df.to_csv(accuracy_file_path, index=False)
