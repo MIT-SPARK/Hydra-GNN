@@ -349,6 +349,10 @@ def run(
         if not receiver.recv(poll_time_ms):
             continue
 
+        # grab all the incoming updates
+        while receiver.recv(1):
+            continue
+
         predicted_labels = model.infer(receiver.graph)
 
         G = dsg.DynamicSceneGraph()
