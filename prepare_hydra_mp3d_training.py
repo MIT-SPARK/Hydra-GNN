@@ -4,6 +4,7 @@ from hydra_gnn.preprocess_dsgs import hydra_object_feature_converter, dsg_node_c
 from spark_dsg.mp3d import load_mp3d_info
 import spark_dsg as dsg
 import os
+import shutil
 import argparse
 import numpy as np
 import gensim
@@ -64,6 +65,8 @@ if __name__ == "__main__":
     trajectory_dirs = os.listdir(HYDRA_TRAJ_DIR)
     skipped_json_files = {'none': [], 'no room': [], 'no object': []}
     data_list = []
+    htree_construction_time = 0.0
+    max_htree_construction_time = 0.0
     for i, trajectory_name in enumerate(trajectory_dirs):
         trajectory_dir = os.path.join(HYDRA_TRAJ_DIR, trajectory_name)
         scene_id, _, trajectory_id = trajectory_name.split('_')
@@ -104,25 +107,34 @@ if __name__ == "__main__":
                 skipped_json_files['no object'].append(os.path.join(trajectory_name, json_file_name))
                 continue
             data.add_object_edges(threshold_near=threshold_near, max_near=max_near, max_on=max_on)
-            data.compute_torch_data(
+            htree_time = data.compute_torch_data(
                 use_heterogeneous=(not args.save_homogeneous),
                 node_converter=dsg_node_converter(object_feature_converter, room_feature_converter),
                 object_synonyms=object_synonyms, 
                 room_synonyms=room_synonyms)
+            if args.save_htree:
+                max_htree_construction_time = max(max_htree_construction_time, htree_time)
+                htree_construction_time += htree_time
+
             data.clear_dsg()    # remove hydra dsg for output
             data_list.append(data)
         
         if i == 0:
             print(f"Number of node features: {data.num_node_features()}")
-        print(f"Done converting {i + 1}/{len(trajectory_dirs)} trajectories.")
+        print(f"Done converting {i + 1}/{len(trajectory_dirs)} trajectories. ")
 
-    with open(os.path.join(args.output_dir, args.output_filename), 'wb') as output_file:
+    if args.save_htree:
+        print(f"Totla h-tree construction time: {htree_construction_time: 0.2f}. (max: {max_htree_construction_time})")
+    
+    output_file_path = os.path.join(args.output_dir, args.output_filename)
+    with open(output_file_path, 'wb') as output_file:
         pickle.dump(data_list, output_file)
+    print(f"Saved {len(data_list)} scene graphs with at least one room and one object to {output_file_path}.")
 
     # save dataset stat
     data_stat_dir = os.path.join(args.output_dir, os.path.splitext(args.output_filename)[0] + '_stat')
     if os.path.exists(data_stat_dir):
-        os.rmdir(data_stat_dir)
+        shutil.rmtree(data_stat_dir)
     else:
         os.mkdir(data_stat_dir)
     # save room connectivity threshold and label mapping

@@ -1,11 +1,11 @@
 from hydra_gnn.preprocess_dsgs import get_spark_dsg, get_room_object_dsg, convert_label_to_y, add_object_connectivity
-from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch, HTREE_NODE_TYPES, HTREE_EDGE_TYPES
+from neural_tree.construct import generate_htree, add_virtual_nodes_to_htree, nx_htree_to_torch
 import os.path
 import torch.utils
 import torch.nn.functional
-import networkx as nx
 from torch_geometric.utils import is_undirected
 from torch_geometric.data import HeteroData
+import time
 
 
 EDGE_TYPES = [('objects', 'objects_to_objects', 'objects'),
@@ -278,6 +278,7 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         Hydra_mp3d_data.compute_torch_data(self, use_heterogeneous=True, node_converter=node_converter, \
             object_synonyms=object_synonyms, room_synonyms=room_synonyms, double_precision=double_precision)
         
+        tic = time.perf_counter()
         # generate heterogeneous networkx htree and add virtual nodes (for training)
         htree_nx = generate_htree(self._torch_data, verbose=False)
         htree_aug_nx = add_virtual_nodes_to_htree(htree_nx)
@@ -299,9 +300,13 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
         self._torch_data['object_virtual'].y = torch.tensor(object_y)
         self._torch_data['room_virtual'].y = torch.tensor(room_y)
+        
+        toc = time.perf_counter()
 
         if not use_heterogeneous:
             self.to_homogeneous()
+        
+        return toc - tic
 
     def num_graph_nodes(self):
         if self.is_heterogeneous():
