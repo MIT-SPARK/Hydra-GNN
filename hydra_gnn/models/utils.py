@@ -94,3 +94,8 @@ def cross_entropy_loss(pred, label, mask=None):
             loss_sum = sum(F.cross_entropy(p[m, :], l[m], reduction='sum') for p, l, m in zip(pred, label, mask))
             num_labels = sum(torch.numel(l[m]) for l, m in zip(label, mask))
         return loss_sum / num_labels
+        # if mask is None:
+        #     loss_sum = sum(F.cross_entropy(p, l) for p, l in zip(pred, label))
+        # else:
+        #     loss_sum = sum(F.cross_entropy(p[m, :], l[m]) for p, l, m in zip(pred, label, mask))
+        # return loss_sum
