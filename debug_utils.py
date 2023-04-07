@@ -1,9 +1,10 @@
-from hydra_gnn.utils import PROJECT_DIR, HYDRA_TRAJ_DIR, MP3D_HOUSE_DIR, COLORMAP_DATA_PATH, WORD2VEC_MODEL_PATH, MP3D_OBJECT_LABEL_DATA_PATH
+from hydra_gnn.utils import HYDRA_TRAJ_DIR, MP3D_HOUSE_DIR, COLORMAP_DATA_PATH, WORD2VEC_MODEL_PATH, MP3D_OBJECT_LABEL_DATA_PATH
 from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data
 from hydra_gnn.preprocess_dsgs import hydra_object_feature_converter, dsg_node_converter, OBJECT_LABELS, ROOM_LABELS, _get_label_dict
 from spark_dsg.mp3d import load_mp3d_info
 import spark_dsg as dsg
 import torch_geometric.utils as pyg_utils
+import torch
 import os
 import numpy as np
 import gensim
@@ -40,6 +41,27 @@ room_label_list = [''] * num_room_labels
 for mp3d_label, label in room_label_dict.items():
     room_label_list[label] += str(mp3d_label) + ', ' 
 room_label_list = [label_str[:-2] for label_str in room_label_list]
+
+
+# helper function to visualize GNN model
+def gnn_model_summary(model):
+    model_params_list = list(model.named_parameters())
+    print("----------------------------------------------------------------")
+    line_new = "{:>20}  {:>25} {:>15}".format("Layer.Parameter", "Param Tensor Shape", "Param #")
+    print(line_new)
+    print("----------------------------------------------------------------")
+    for elem in model_params_list:
+        p_name = elem[0] 
+        p_shape = list(elem[1].size())
+        p_count = torch.tensor(elem[1].size()).prod().item()
+        line_new = "{:>20}  {:>25} {:>15}".format(p_name, str(p_shape), str(p_count))
+        print(line_new)
+    print("----------------------------------------------------------------")
+    total_params = sum([param.nelement() for param in model.parameters()])
+    print("Total params:", total_params)
+    num_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print("Trainable params:", num_trainable_params)
+    print("Non-trainable params:", total_params - num_trainable_params)
 
 
 # helper function to regenerate mp3d data
