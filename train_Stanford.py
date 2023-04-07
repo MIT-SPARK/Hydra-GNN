@@ -14,11 +14,13 @@ from pprint import pprint
 
 
 # parameter sweep setup (note: last GAT hidden_dims is label dim and therefore not specified)
-GAT_hidden_dims = plist('GAT_hidden_dims', [[128], [128, 128]])
-dropout = plist('dropout', [0.1, 0.2, 0.3])
-lr = plist('lr', [0.001])
-weight_decay = plist('weight_decay', [0.0])
-param_dict_list = pgrid(lr, weight_decay, GAT_hidden_dims, dropout)
+GAT_hidden_dims = plist('GAT_hidden_dims', [[64, 64], [128, 128]])
+GAT_head = plist('GAT_head', [6])    # same number of head in each conv layer
+GAT_concat = plist('GAT_concat', [True])    # same concate in each conv layer except the last (always False)
+dropout = plist('dropout', [0, 0.25])
+lr = plist('lr', [0.001, 0.0005])
+weight_decay = plist('weight_decay', [0.0, 0.0001, 0.001])
+param_dict_list = pgrid(lr, weight_decay, GAT_hidden_dims, GAT_head, GAT_concat, dropout)
 
 
 if __name__ == "__main__":
@@ -106,16 +108,12 @@ if __name__ == "__main__":
             param_list = [param_dict[key] for key in log_params]
             if config['network']['conv_block'][:3] == 'GAT':
                 # todo: this is for temporary GAT tuning with single attention head
-                param_dict['GAT_heads'] = len(param_dict['GAT_hidden_dims']) * [6] + [6]
-                param_dict['GAT_concats'] = len(param_dict['GAT_hidden_dims']) * [True] + [True]
-
-                # check GAT params
-                if len(param_dict['GAT_heads']) != len(param_dict['GAT_hidden_dims']) + 1 or \
-                    len(param_dict['GAT_concats']) != len(param_dict['GAT_hidden_dims']) + 1:
-                    print('  Skip - invalid GAT param')
-                    continue
-            update_existing_keys(config['network'], param_dict)
-            update_existing_keys(config['optimization'], param_dict)
+                if config['data']['type'] == 'homogeneous':
+                    param_dict['GAT_heads'] = len(param_dict['GAT_hidden_dims']) * [param_dict['GAT_head']]
+                    param_dict['GAT_concats'] = len(param_dict['GAT_hidden_dims']) * [param_dict['GAT_concat']]
+                else:
+                    param_dict['GAT_heads'] = len(param_dict['GAT_hidden_dims']) * [param_dict['GAT_head']] + [param_dict['GAT_head']]
+                    param_dict['GAT_concats'] = len(param_dict['GAT_hidden_dims']) * [param_dict['GAT_concat']] + [False]
 
         pprint('config:')
         pprint(config)
