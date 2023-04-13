@@ -4,6 +4,11 @@ Various utilities for using GNNs with Hydra
 
 Make a virtual environment and install `requirements.txt` for a minimal set of functionality. Some code may require the hydra python bindings (see [here](https://github.mit.edu:SPARK/hydra_python) for details).
 
+The minimal requirement to run training code with pickled dataset file is installing [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html) with [pyg_lib](https://github.com/pyg-team/pyg-lib) for Heterogeneous GNN operators, and the following dependencies:
+```
+pip install pandas plotly networkx tensorboardX pyyaml
+```
+This code is tested on PyTorch 1.12.1, PyTorch Geometric 2.2.0 with Cuda 11.3, and PyTorch 1.8.1, PyTorch Geometric 2.0.4 with Cuda 10.2.
 
 ## H-tree Construction 
 by Rajat Talak
