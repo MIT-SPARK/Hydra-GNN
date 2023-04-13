@@ -1,0 +1,23 @@
+data:
+    file_path: "output/preprocessed_Stanford3DSG/htree_nt.pkl"
+    type: "homogeneous"
+
+run_control:
+    num_runs: 100
+    early_stop_window: -1
+
+network:
+    disable_initialization: True
+    conv_block: 'GCN'
+    hidden_dim: 128
+    num_layers: 4
+    dropout: 0.25
+
+optimization:
+    lr: 0.01
+    num_epochs: 1000
+    weight_decay: 0.0
+    batch_size: 512
+
+logger:
+    output_dir: "output/log_Stanford_final/htree_GCN"

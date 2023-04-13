@@ -1,0 +1,24 @@
+data:
+    file_path: "output/preprocessed_mp3d/htree_gt20.pkl"
+    type: "heterogeneous"
+
+run_control:
+    num_runs: 10
+    early_stop_window: 600
+
+network:
+    disable_initialization: True
+    conv_block: 'GAT_edge'
+    dropout: 0.4
+    GAT_hidden_dims: [64, 64]
+    GAT_heads: [3, 3, 3]
+    GAT_concats: [False, False, False]
+
+optimization:
+    lr: 0.002
+    num_epochs: 800
+    weight_decay: 0.001
+    batch_size: 2048
+
+logger:
+    output_dir: "output/log_final/htree_gt20"

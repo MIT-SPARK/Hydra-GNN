@@ -1,0 +1,24 @@
+data:
+    file_path: "output/preprocessed_Stanford3DSG/htree_nt.pkl"
+    type: "heterogeneous"
+
+run_control:
+    num_runs: 10
+    early_stop_window: -1
+
+network:
+    disable_initialization: True
+    conv_block: 'GAT'
+    dropout: 0.25
+    GAT_hidden_dims: [64, 64, 64]
+    GAT_heads: [6, 6, 6, 6]
+    GAT_concats: [True, True, True, False]
+
+optimization:
+    lr: 0.0005
+    num_epochs: 1000
+    weight_decay: 0.0001
+    batch_size: 512
+
+logger:
+    output_dir: "output/log_Stanford_final/htree_hetero_GAT"

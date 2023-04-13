@@ -1,0 +1,23 @@
+data:
+    file_path: "output/preprocessed_Stanford3DSG/data_nt.pkl"
+    type: "heterogeneous"
+
+run_control:
+    num_runs: 20
+    early_stop_window: -1
+
+network:
+    conv_block: 'GAT_edge'
+    dropout: 0.25
+    GAT_hidden_dims: [64]
+    GAT_heads: [6, 6]
+    GAT_concats: [True, False]
+
+optimization:
+    lr: 0.001
+    num_epochs: 1000
+    weight_decay: 0.0001
+    batch_size: 512
+
+logger:
+    output_dir: "output/log_Stanford_final/baseline_hetero_GAT_edge"
