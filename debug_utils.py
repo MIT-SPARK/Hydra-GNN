@@ -10,9 +10,6 @@ import numpy as np
 import gensim
 import pandas as pd
 
-from ipywidgets import IntProgress
-from IPython.display import display
-import plotly.express as px
 import plotly.graph_objects as go
 
 
@@ -73,8 +70,6 @@ def generate_mp3d_datalist(expand_rooms=False, save_htree=False):
         room_feature_converter = lambda i: np.zeros(0)
 
     trajectory_dirs = os.listdir(HYDRA_TRAJ_DIR)
-    progress_bar = IntProgress(value=0, min=0, max=len(trajectory_dirs), description='Progress:', bar_stlye='info')
-    display(progress_bar)
     
     skipped_json_files = {'none': [], 'no room': [], 'no object': []}
     data_list = []
