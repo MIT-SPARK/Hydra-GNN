@@ -3,6 +3,7 @@ from hydra_gnn.Stanford3DSG_dataset import Stanford3DSG_data, Stanford3DSG_htree
     Stanford3DSG_object_feature_converter, Stanford3DSG_room_feature_converter
 from hydra_gnn.preprocess_dsgs import dsg_node_converter
 import os
+import shutil
 import argparse
 import numpy as np
 import gensim
@@ -10,7 +11,7 @@ import pickle
 import yaml
 
 
-# data params
+# data params (used only with --from_raw_data flag)
 threshold_near=1.5
 max_near=2.0
 max_on=0.2
@@ -52,6 +53,8 @@ if __name__ == "__main__":
 
     # process dataset as a list of torch data
     data_list = []
+    htree_construction_time = 0.0
+    max_htree_construction_time = 0.0
     if args.from_raw_data:
         data_files = os.listdir(STANFORD3DSG_DATA_DIR)
         for i, data_file in enumerate(data_files):
@@ -82,10 +85,17 @@ if __name__ == "__main__":
                 data = Stanford3DSG_data(data_dict=data_dict, 
                                          room_semantic_dict=semantic_dict['room'], 
                                          object_semantic_dict=semantic_dict['object'])
-            data.compute_torch_data(use_heterogeneous=True, node_converter=node_converter)
+            htree_time = data.compute_torch_data(use_heterogeneous=True, node_converter=node_converter)
+            if args.save_htree:
+                max_htree_construction_time = max(max_htree_construction_time, htree_time)
+                htree_construction_time += htree_time
+            
             data.clear_dsg()
             data_list.append(data)
+
     print(f"Number of node features: {data.num_node_features()}")
+    if args.save_htree:
+        print(f"Totla h-tree construction time: {htree_construction_time: 0.2f}. (max: {max_htree_construction_time})")
 
     with open(os.path.join(args.output_dir, args.output_filename), 'wb') as output_file:
         pickle.dump(data_list, output_file)
@@ -93,7 +103,7 @@ if __name__ == "__main__":
     # save dataset stat: room connectivity threshold (if applicable); label mapping
     data_stat_dir = os.path.join(args.output_dir, os.path.splitext(args.output_filename)[0] + '_stat')
     if os.path.exists(data_stat_dir):
-        os.rmdir(data_stat_dir)
+        shutil.rmtree(data_stat_dir)
     else:
         os.mkdir(data_stat_dir)
         print(data_stat_dir)
