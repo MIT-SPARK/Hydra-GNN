@@ -73,6 +73,7 @@ class SemiSupervisedTrainingJob(BaseTrainingJob):
         # create data loader
         data_loader = DataLoader(self._dataset, batch_size=optimization_params['batch_size'],
                                  shuffle=optimization_params['shuffle'])
+        test_loader = DataLoader(self._dataset, batch_size=len(self._dataset))
 
         # set up optimizer
         opt = optim.Adam(self._net.parameters(), lr=optimization_params['lr'], 
@@ -120,11 +121,11 @@ class SemiSupervisedTrainingJob(BaseTrainingJob):
             my_lr_scheduler.step()
 
             if verbose:
-                train_result = self.test(data_loader, mask_name='train_mask')
+                train_result = self.test(test_loader, mask_name='train_mask')
                 writer.add_scalar('train result', train_result, epoch)
 
             # validation and testing
-            val_result = self.test(data_loader, mask_name='val_mask')
+            val_result = self.test(test_loader, mask_name='val_mask')
             writer.add_scalar('validation result', val_result, epoch)
             if epoch >= min_log_epoch and val_result > max_val_acc:
                 max_val_acc = val_result
@@ -145,7 +146,7 @@ class SemiSupervisedTrainingJob(BaseTrainingJob):
         # load best model to compute test result
         self._net.load_state_dict(best_model_state)
         tic = time.perf_counter()
-        test_result = self.test(data_loader, mask_name='test_mask')
+        test_result = self.test(test_loader, mask_name='test_mask')
         toc = time.perf_counter()
         print('Testing completed (time elapsed: {:.4f} s). '.format(toc - tic))
         print('Best validation accuracy: {:.4f}, corresponding test accuracy: {:.4f}.'.
