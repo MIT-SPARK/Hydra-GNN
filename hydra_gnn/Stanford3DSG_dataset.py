@@ -7,6 +7,7 @@ import torch.utils
 import torch.nn.functional
 from torch_geometric.data import HeteroData
 import random
+import time
 
 
 # room and object labels in Stanford3DSG tiny/verified split
@@ -244,6 +245,7 @@ class Stanford3DSG_htree_data(Stanford3DSG_data):
         Stanford3DSG_data.compute_torch_data(self, use_heterogeneous=True, node_converter=node_converter, \
             double_precision=double_precision)
         
+        tic = time.perf_counter()
         # generate heterogeneous networkx htree and add virtual nodes (for training)
         htree_nx = generate_htree(self._torch_data, verbose=False)
         htree_aug_nx = add_virtual_nodes_to_htree(htree_nx)
@@ -255,8 +257,12 @@ class Stanford3DSG_htree_data(Stanford3DSG_data):
         self._torch_data['object_virtual'].y = self._torch_data['object_virtual'].label.long()
         self._torch_data['room_virtual'].y = self._torch_data['room_virtual'].label.long()
         
+        toc = time.perf_counter()
+
         if not use_heterogeneous:
             self.to_homogeneous()
+
+        return toc - tic
     
     def num_graph_nodes(self):
         if self.is_heterogeneous():
@@ -402,4 +408,3 @@ class Stanford3DSG_dataset(torch.utils.data.Dataset):
 
     def clear_dataset(self):
         self._data_list = []
-    
