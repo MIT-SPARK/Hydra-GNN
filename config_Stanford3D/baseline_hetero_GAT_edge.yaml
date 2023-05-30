@@ -20,4 +20,4 @@ optimization:
     batch_size: 128
 
 logger:
-    output_dir: "output/log_test/baseline_hetero_GAT_edge"
+    output_dir: "output/log_Stanford/baseline_hetero_GAT_edge"

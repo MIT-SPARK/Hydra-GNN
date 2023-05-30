@@ -19,4 +19,4 @@ optimization:
     batch_size: 128
 
 logger:
-    output_dir: "output/log_test/baseline_GraphSAGE"
+    output_dir: "output/log_Stanford/baseline_GraphSAGE"

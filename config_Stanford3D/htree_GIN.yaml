@@ -20,4 +20,4 @@ optimization:
     batch_size: 128
 
 logger:
-    output_dir: "output/log_test/htree_GIN"
+    output_dir: "output/log_Stanford/htree_GIN"

@@ -20,4 +20,4 @@ optimization:
     batch_size: 2048
 
 logger:
-    output_dir: "output/log_final/data_gt60_noW"
+    output_dir: "output/log_mp3d/data_gt60_noW"
