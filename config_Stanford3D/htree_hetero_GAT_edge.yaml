@@ -3,7 +3,7 @@ data:
     type: "heterogeneous"
 
 run_control:
-    num_runs: 10
+    num_runs: 100
     early_stop_window: -1
 
 network:
@@ -18,7 +18,7 @@ optimization:
     lr: 0.0005
     num_epochs: 1000
     weight_decay: 0.0001
-    batch_size: 512
+    batch_size: 128
 
 logger:
-    output_dir: "output/log_Stanford_final/htree_hetero_GAT_edge"
+    output_dir: "output/log_test/htree_hetero_GAT_edge"

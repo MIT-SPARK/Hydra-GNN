@@ -16,7 +16,7 @@ optimization:
     lr: 0.005
     num_epochs: 1000
     weight_decay: 0.001
-    batch_size: 512
+    batch_size: 128
 
 logger:
-    output_dir: "output/log_Stanford_final/baseline_GraphSAGE"
+    output_dir: "output/log_test/baseline_GraphSAGE"
