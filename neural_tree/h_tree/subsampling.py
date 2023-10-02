@@ -1,6 +1,7 @@
 import networkx as nx
 import numpy as np
 import itertools
+
 # from IPython.display import clear_output
 
 # Input: Graph G and number k
@@ -23,7 +24,7 @@ def graph_initialize(G):
     weight_attribute_dict = {}
     for node in G.nodes():
         score_attribute_dict[node] = 0.0
-        k_set_attribute_dict[node] = set() # This attribute will always remain a set
+        k_set_attribute_dict[node] = set()  # This attribute will always remain a set
 
     for edge in G.edges():
         weight_attribute_dict[edge] = 1.0
@@ -36,20 +37,21 @@ def graph_initialize(G):
     return G
 
 
-def score_function(node, Clique, G, type='type2'):
-
+def score_function(node, Clique, G, type="type2"):
     alpha = 0.1
 
-    if type == 'type1':
+    if type == "type1":
         # type1:: is a random score function. Eq (1) in the paper.
         return np.random.uniform(low=0.0, high=alpha, size=1)
 
-    elif type == 'type2':
+    elif type == "type2":
         # type2:: score function in Eq (2) in the paper.
         score_temp = 0
         for neighbor in list(G.neighbors(node)):
             if neighbor in Clique:
-                score_temp += G.edges[(node, neighbor)]["weight"] + np.random.uniform(low=0.0, high=alpha, size=1)
+                score_temp += G.edges[(node, neighbor)]["weight"] + np.random.uniform(
+                    low=0.0, high=alpha, size=1
+                )
         return score_temp
 
     else:
@@ -78,28 +80,23 @@ def score_update(G, k, inducted_node, inducted_to_clique):
     # a k-clique. In this case, just update for Clique=C.
     # If C, on the other hand, has size larger than k -- Declare ValueError.
 
-    H = G # creating a copy of G, to be returned
+    H = G  # creating a copy of G, to be returned
 
     if len(inducted_to_clique) < k:
-
         # Case where the only set you update for is C
         S = set(inducted_to_clique)
         S.add(inducted_node)
 
         for v in nx.neighbors(G, inducted_node):
-
-            H.nodes[v]["score"] = score_function(node=v, Clique=S, G=G, type='type2')
+            H.nodes[v]["score"] = score_function(node=v, Clique=S, G=G, type="type2")
             H.nodes[v]["k_set"] = S
 
-
     elif len(inducted_to_clique) == k:
-
         # Case where you have to choose all k-subsets of S = C \union {u}
         S = set(inducted_to_clique)
         S.add(inducted_node)
 
         for v in nx.neighbors(G, inducted_node):
-
             # Note: This updates score and k_set values for all neighbors of v.
             #       This includes even those nodes that are already inducted.
             #       Since, we won't be using the already inducted nodes, it shouldn't matter.
@@ -107,9 +104,8 @@ def score_update(G, k, inducted_node, inducted_to_clique):
             score_temp = 0.0
             set_temp = set()
             for k_set in itertools.combinations(S, k):
-
                 # k_set is a set of size k of S = C \union {u}
-                new_score = score_function(node=v, Clique=set(k_set), G=G, type='type2')
+                new_score = score_function(node=v, Clique=set(k_set), G=G, type="type2")
                 if new_score > score_temp:
                     score_temp = new_score
                     set_temp = set(k_set)
@@ -124,15 +120,14 @@ def score_update(G, k, inducted_node, inducted_to_clique):
 
 
 def key_with_max_val(d):
-    """ a) create a list of the dict's keys and values;
-        b) return the key with the max value"""
+    """a) create a list of the dict's keys and values;
+    b) return the key with the max value"""
     v = list(d.values())
     k = list(d.keys())
     return k[v.index(max(v))]
 
 
 def sample_node(G, taken_nodes):
-
     # Accessing the score values of nodes. Creates a dictionary.
     node_scores = nx.get_node_attributes(G, "score")
 
@@ -155,7 +150,7 @@ def graph_add(node, node_set, Subgraph, Graph):
     for v in node_set:
         if (node, v) in Graph.edges():
             # EDGE ATTRIBUTES MUST BE COPIED
-            Subgraph.add_edge(node,v)
+            Subgraph.add_edge(node, v)
 
     return Subgraph
 
@@ -173,7 +168,6 @@ def clique_add(node, node_set, Subgraph):
 
 
 def Initialize_kTree_And_Subgraph(G, k):
-
     # Input G:: Graph that has valid score and weight attribute for each node and edge, respectively.
     # Input k:: Treewidth bound
 
@@ -185,29 +179,32 @@ def Initialize_kTree_And_Subgraph(G, k):
 
     # Step 1: Randomly select a node in G. Add it to U and K.
     sampled_node = np.random.choice(G.nodes())
-    U.add_node(sampled_node)    # NODE ATTRIBUTES MUST BE COPIED
+    U.add_node(sampled_node)  # NODE ATTRIBUTES MUST BE COPIED
     K.add_node(sampled_node)
     score_update(G=G, k=k, inducted_node=sampled_node, inducted_to_clique=[])
 
     # Step 2: Add node u in G with maximum score. Update U and K.
     while len(U.nodes()) < k:
-
         taken_nodes = U.nodes()
         sampled_node = sample_node(G, taken_nodes)
 
         # update U
-        U = graph_add(node=sampled_node, node_set=taken_nodes, Subgraph=U, Graph=G) # NODE ATTRIBUTES MUST BE COPIED
+        U = graph_add(
+            node=sampled_node, node_set=taken_nodes, Subgraph=U, Graph=G
+        )  # NODE ATTRIBUTES MUST BE COPIED
 
         # update K
         K = clique_add(node=sampled_node, node_set=taken_nodes, Subgraph=K)
 
         # update score
-        G = score_update(G=G, k=k, inducted_node=sampled_node, inducted_to_clique=taken_nodes)
+        G = score_update(
+            G=G, k=k, inducted_node=sampled_node, inducted_to_clique=taken_nodes
+        )
 
     return U, K, G
 
 
-def bounded_treewidth_sampling(G, k, copy_node_attributes='x', verbose=False):
+def bounded_treewidth_sampling(G, k, copy_node_attributes="x", verbose=False):
     # Input: G:: NetworkX Graph
     # Input: k:: tree-width bound
 
@@ -222,7 +219,6 @@ def bounded_treewidth_sampling(G, k, copy_node_attributes='x', verbose=False):
     # Loop
     progress_threshold = 0
     while len(U.nodes()) < len(G.nodes()):
-
         # clear_output(wait=False)
         # print("Progress Graph Sampling: ", len(U.nodes()), "/", len(G.nodes()))
         if 100.0 * len(U.nodes()) / len(G.nodes()) > progress_threshold + 5:

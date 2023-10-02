@@ -5,7 +5,10 @@ from torch_geometric.utils import to_networkx
 from torch_geometric.data import HeteroData, Data
 import torch
 import networkx as nx
-from networkx.algorithms.approximation.treewidth import treewidth_min_degree, treewidth_min_fill_in
+from networkx.algorithms.approximation.treewidth import (
+    treewidth_min_degree,
+    treewidth_min_fill_in,
+)
 import plotly.graph_objects as go
 import plotly.express as px
 import os.path
@@ -21,7 +24,9 @@ MP3D_HOUSE_DIR = os.path.join(DATA_DIR, "house_files")
 MP3D_OBJECT_LABEL_DATA_PATH = os.path.join(DATA_DIR, "mpcat40.tsv")
 HYDRA_TRAJ_DIR = os.path.join(DATA_DIR, "tro_graphs_2022_09_24")
 COLORMAP_DATA_PATH = os.path.join(DATA_DIR, "colormap.csv")
-STANFORD3DSG_DATA_DIR = os.path.join(PROJECT_DIR, "data/Stanford3DSceneGraph/tiny/verified_graph")
+STANFORD3DSG_DATA_DIR = os.path.join(
+    PROJECT_DIR, "data/Stanford3DSceneGraph/tiny/verified_graph"
+)
 STANFORD3DSG_GRAPH_PATH = os.path.join(PROJECT_DIR, "data/Stanford3DSG.pkl")
 WORD2VEC_MODEL_PATH = os.path.join(DATA_DIR, "GoogleNews-vectors-negative300.bin")
 
@@ -32,28 +37,36 @@ def print_log(string, file):
 
 
 def update_existing_keys(dict_to_update, dict_input):
-    dict_to_update.update({k:v for k, v in dict_input.items() if k in dict_to_update.keys()})
+    dict_to_update.update(
+        {k: v for k, v in dict_input.items() if k in dict_to_update.keys()}
+    )
 
 
 # -----------------------------------------------------------------------------
 # Data analysis: graph treewidth, htree diameter
 # -----------------------------------------------------------------------------
 def extract_object_graph(graph_torch, to_nx=True):
-    if not graph_torch['objects']:
+    if not graph_torch["objects"]:
         object_graph = Data()
         if to_nx:
             object_graph = nx.empty_graph()
     else:
-        if graph_torch['objects', 'objects_to_objects', 'objects']:
-            object_graph = Data(x=graph_torch['objects'].x,
-                                pos=graph_torch['objects'].pos,
-                                y=graph_torch['objects'].label,
-                                edge_index=graph_torch['objects', 'objects_to_objects', 'objects']['edge_index'])
+        if graph_torch["objects", "objects_to_objects", "objects"]:
+            object_graph = Data(
+                x=graph_torch["objects"].x,
+                pos=graph_torch["objects"].pos,
+                y=graph_torch["objects"].label,
+                edge_index=graph_torch["objects", "objects_to_objects", "objects"][
+                    "edge_index"
+                ],
+            )
         else:
-            object_graph = Data(x=graph_torch['objects'].x,
-                                pos=graph_torch['objects'].pos,
-                                y=graph_torch['objects'].label,
-                                edge_index=torch.zeros(2, 0).to(dtype=torch.long))
+            object_graph = Data(
+                x=graph_torch["objects"].x,
+                pos=graph_torch["objects"].pos,
+                y=graph_torch["objects"].label,
+                edge_index=torch.zeros(2, 0).to(dtype=torch.long),
+            )
         if to_nx:
             object_graph = to_networkx(object_graph).to_undirected()
 
@@ -61,37 +74,46 @@ def extract_object_graph(graph_torch, to_nx=True):
 
 
 def extract_room_graph(graph_torch, to_nx=True):
-    if not graph_torch['rooms']:
+    if not graph_torch["rooms"]:
         room_graph = Data()
         if to_nx:
             room_graph = nx.empty_graph()
     else:
-        if graph_torch['rooms', 'rooms_to_rooms', 'rooms']:
-            room_graph = Data(x=graph_torch['rooms'].x,
-                              pos=graph_torch['rooms'].pos,
-                              y=graph_torch['rooms'].label,
-                              edge_index=graph_torch['rooms', 'rooms_to_rooms', 'rooms']['edge_index'])
+        if graph_torch["rooms", "rooms_to_rooms", "rooms"]:
+            room_graph = Data(
+                x=graph_torch["rooms"].x,
+                pos=graph_torch["rooms"].pos,
+                y=graph_torch["rooms"].label,
+                edge_index=graph_torch["rooms", "rooms_to_rooms", "rooms"][
+                    "edge_index"
+                ],
+            )
         else:
-            room_graph = Data(x=graph_torch['rooms'].x,
-                              pos=graph_torch['rooms'].pos,
-                              y=graph_torch['rooms'].label,
-                              edge_index=torch.zeros(2, 0).to(dtype=torch.long))
+            room_graph = Data(
+                x=graph_torch["rooms"].x,
+                pos=graph_torch["rooms"].pos,
+                y=graph_torch["rooms"].label,
+                edge_index=torch.zeros(2, 0).to(dtype=torch.long),
+            )
         if to_nx:
             room_graph = to_networkx(room_graph).to_undirected()
 
     return room_graph
 
 
-def get_treewidth(torch_data, graph_type='full'):
+def get_treewidth(torch_data, graph_type="full"):
     """
     Find treewidth upper bound of the full input PyG graph, or the object subgraphs, or the room subgraph,
     using approximate algorithms.
     """
-    assert graph_type in ['full', 'object', 'room']
-    if graph_type == 'full':
-        nx_graph = to_networkx(torch_data.to_homogeneous()).to_undirected() \
-            if isinstance(torch_data, HeteroData) else to_networkx(torch_data).to_undirected()
-    elif graph_type == 'object':
+    assert graph_type in ["full", "object", "room"]
+    if graph_type == "full":
+        nx_graph = (
+            to_networkx(torch_data.to_homogeneous()).to_undirected()
+            if isinstance(torch_data, HeteroData)
+            else to_networkx(torch_data).to_undirected()
+        )
+    elif graph_type == "object":
         nx_graph = extract_object_graph(torch_data, to_nx=True)
     else:
         nx_graph = extract_room_graph(torch_data, to_nx=True)
@@ -126,42 +148,55 @@ def get_diameters(torch_data, valid_room_labels=None):
     data_htree = data_htree.to_homogeneous()
 
     # find diameter of each connected component using networkx
-    nx_data = to_networkx(data_htree, node_attrs=['label', 'clique_has']).to_undirected()
+    nx_data = to_networkx(
+        data_htree, node_attrs=["label", "clique_has"]
+    ).to_undirected()
     diameters = []
     valid_room_ids = []
     for c in nx.connected_components(nx_data):
         subgraph = nx_data.subgraph(c)
         if valid_room_labels is None:
             diameters.append(nx.diameter(subgraph))
-        else:   # skip subgraphs where all rooms are unlabeld -- i.e. ignored by training
+        else:  # skip subgraphs where all rooms are unlabeld -- i.e. ignored by training
             # todo: this code does not distinguish room and object nodes -- but works on hydra labels
-            room_idx = [idx for idx, data_dict in subgraph.nodes.items() \
-                if data_dict['label'] in valid_room_labels]
+            room_idx = [
+                idx
+                for idx, data_dict in subgraph.nodes.items()
+                if data_dict["label"] in valid_room_labels
+            ]
             # this assumes objects are saved before rooms in htree construction
-            offset = torch_data['object_virtual'].num_nodes
+            offset = torch_data["object_virtual"].num_nodes
             if len(room_idx) != 0:
                 diameters.append(nx.diameter(subgraph))
-                valid_room_ids.append(set(subgraph.nodes[idx]['clique_has'] - offset for idx in room_idx))
-    
+                valid_room_ids.append(
+                    set(subgraph.nodes[idx]["clique_has"] - offset for idx in room_idx)
+                )
+
     if valid_room_labels is not None:
         return diameters, valid_room_ids
     else:
         return diameters
-        
+
+
 # -----------------------------------------------------------------------------
 # Plot heterogenous torch data
 # -----------------------------------------------------------------------------
 def _filter_empty_nodes(torch_data):
-    return lambda node_type: torch_data[node_type].num_nodes is not None and torch_data[node_type].num_nodes > 0
+    return (
+        lambda node_type: torch_data[node_type].num_nodes is not None
+        and torch_data[node_type].num_nodes > 0
+    )
 
 
-def plot_heterogeneous_graph(torch_data, node_filter_func=_filter_empty_nodes, **kwargs):
+def plot_heterogeneous_graph(
+    torch_data, node_filter_func=_filter_empty_nodes, **kwargs
+):
     assert isinstance(torch_data, torch_geometric.data.HeteroData)
 
     # plot style params
-    marker_size = 6 if 'marker_size' not in kwargs else kwargs['marker_size']
-    title = 'Heterogeneous Scene Graph' if 'title' not in kwargs else kwargs['title']
-    z_axis_offset = 3.0 if 'z_offset' not in kwargs else kwargs['z_offset']
+    marker_size = 6 if "marker_size" not in kwargs else kwargs["marker_size"]
+    title = "Heterogeneous Scene Graph" if "title" not in kwargs else kwargs["title"]
+    z_axis_offset = 3.0 if "z_offset" not in kwargs else kwargs["z_offset"]
 
     fig = go.Figure()
     fig.layout.title = title
@@ -172,50 +207,77 @@ def plot_heterogeneous_graph(torch_data, node_filter_func=_filter_empty_nodes, *
 
     # scene nodes
     for i, node_type in enumerate(node_types):
-        pos = torch_data[node_type]['pos']
-        if 'label' in torch_data.keys:
+        pos = torch_data[node_type]["pos"]
+        if "label" in torch_data.keys:
             label = torch_data[node_type].label.tolist()
             node_label = [f"label: {l}" for l in label]
         else:
             node_label = None
-        plotly_nodes = go.Scatter3d(x=pos[:, 0],
-                                    y=pos[:, 1],
-                                    z=pos[:, 2] + i * z_axis_offset,
-                                    mode='markers',
-                                    marker=dict(size=marker_size, 
-                                                opacity=0.8,
-                                                color=px.colors.qualitative.Plotly[i*2]),
-                                    hovertext=node_label,
-                                    name=node_type)
+        plotly_nodes = go.Scatter3d(
+            x=pos[:, 0],
+            y=pos[:, 1],
+            z=pos[:, 2] + i * z_axis_offset,
+            mode="markers",
+            marker=dict(
+                size=marker_size, opacity=0.8, color=px.colors.qualitative.Plotly[i * 2]
+            ),
+            hovertext=node_label,
+            name=node_type,
+        )
         fig.add_trace(plotly_nodes)
 
     # scene edges
     for source_node_type, edge_name, target_node_type in edge_types:
-        edge_index = torch_data[source_node_type, edge_name, target_node_type].edge_index
+        edge_index = torch_data[
+            source_node_type, edge_name, target_node_type
+        ].edge_index
 
-        source_node_pos = torch_data[source_node_type]['pos'][edge_index[0, :], :]
-        target_node_pos = torch_data[target_node_type]['pos'][edge_index[1, :], :]
+        source_node_pos = torch_data[source_node_type]["pos"][edge_index[0, :], :]
+        target_node_pos = torch_data[target_node_type]["pos"][edge_index[1, :], :]
 
         num_edges = edge_index.shape[1]
 
         source_offset = node_types.index(source_node_type) * z_axis_offset
         target_offset = node_types.index(target_node_type) * z_axis_offset
-        x_list = sum([[source_node_pos[i, 0].item(), target_node_pos[i, 0].item(), None]
-                      for i in range(num_edges)], [])
-        y_list = sum([[source_node_pos[i, 1].item(), target_node_pos[i, 1].item(), None]
-                      for i in range(num_edges)], [])
-        z_list = sum([[source_node_pos[i, 2].item() + source_offset, target_node_pos[i, 2].item() + target_offset, None]
-                      for i in range(num_edges)], [])
+        x_list = sum(
+            [
+                [source_node_pos[i, 0].item(), target_node_pos[i, 0].item(), None]
+                for i in range(num_edges)
+            ],
+            [],
+        )
+        y_list = sum(
+            [
+                [source_node_pos[i, 1].item(), target_node_pos[i, 1].item(), None]
+                for i in range(num_edges)
+            ],
+            [],
+        )
+        z_list = sum(
+            [
+                [
+                    source_node_pos[i, 2].item() + source_offset,
+                    target_node_pos[i, 2].item() + target_offset,
+                    None,
+                ]
+                for i in range(num_edges)
+            ],
+            [],
+        )
         if source_node_type == target_node_type:
-            color = px.colors.qualitative.Plotly[node_types.index(source_node_type) + len(node_types)]
+            color = px.colors.qualitative.Plotly[
+                node_types.index(source_node_type) + len(node_types)
+            ]
         else:
             color = px.colors.qualitative.Plotly[node_types.index(source_node_type)]
-        plotly_edge = go.Scatter3d(x=x_list,
-                                   y=y_list,
-                                   z=z_list,
-                                   mode='lines',
-                                   line=dict(width=2, color=color),
-                                   name=edge_name)
+        plotly_edge = go.Scatter3d(
+            x=x_list,
+            y=y_list,
+            z=z_list,
+            mode="lines",
+            line=dict(width=2, color=color),
+            name=edge_name,
+        )
         fig.add_trace(plotly_edge)
 
     return fig
@@ -226,11 +288,7 @@ def plot_heterogeneous_graph(torch_data, node_filter_func=_filter_empty_nodes, *
 # https://github.com/elcorto/psweep
 # -----------------------------------------------------------------------------
 def is_seq(seq) -> bool:
-    if (
-        isinstance(seq, str)
-        or isinstance(seq, IOBase)
-        or isinstance(seq, dict)
-    ):
+    if isinstance(seq, str) or isinstance(seq, IOBase) or isinstance(seq, dict):
         return False
     else:
         try:
@@ -238,6 +296,7 @@ def is_seq(seq) -> bool:
             return True
         except TypeError:
             return False
+
 
 def flatten(seq):
     for item in seq:
@@ -247,8 +306,10 @@ def flatten(seq):
             for subitem in flatten(item):
                 yield subitem
 
+
 def plist(name: str, seq: Sequence[Any]):
     return [{name: entry} for entry in seq]
+
 
 def merge_dicts(args: Sequence[dict]):
     dct = {}
@@ -262,9 +323,7 @@ def merge_dicts(args: Sequence[dict]):
 def itr2params(loops: Iterator[Any]):
     ret = [merge_dicts(flatten(entry)) for entry in loops]
     lens = list(map(len, ret))
-    assert (
-        len(np.unique(lens)) == 1
-    ), f"not all psets have same length"
+    assert len(np.unique(lens)) == 1, f"not all psets have same length"
     return ret
 
 

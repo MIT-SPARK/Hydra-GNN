@@ -2,18 +2,19 @@ import networkx as nx
 import time
 
 import sys
-sys.path.append('../..')
+
+sys.path.append("../..")
 from neural_tree.h_tree import subsampling
 
 
 def generate_clique_labels(G, clique_node):
-    """ Generate clique label, which is just the list of nodes in G that it contains. """
+    """Generate clique label, which is just the list of nodes in G that it contains."""
     SG = nx.subgraph(G, clique_node)
     return list(SG.nodes())
 
 
 def generate_node_labels(G):
-    """ Add node attributes clique_has and type to all nodes in the input graph. """
+    """Add node attributes clique_has and type to all nodes in the input graph."""
     clique_has = {}
     type = {}
     for node in list(nx.nodes(G)):
@@ -35,13 +36,15 @@ def generate_jth(G, zero_feature, remove_edges_every_layer=True):
     :param remove_edges_every_layer: bool, if true, remove edges in the same layer of the JT hierarchy
     :return: JTG, root_nodes
     """
-    if len(nx.nodes(G)) == 1 and G.graph['original']:
+    if len(nx.nodes(G)) == 1 and G.graph["original"]:
         JTG = G.copy()
         JTG = nx.relabel_nodes(JTG, {list(nx.nodes(G))[0]: 0})
         return JTG, None
 
     JTG = nx.algorithms.tree.decomposition.junction_tree(G)
-    node_list = [node[0] for node in JTG.nodes.data() if node[1]['type'] == 'clique']  # todo: what does this do?
+    node_list = [
+        node[0] for node in JTG.nodes.data() if node[1]["type"] == "clique"
+    ]  # todo: what does this do?
     JTG = nx.bipartite.projected_graph(JTG, node_list)
 
     # RootNodes = JTG.nodes ## PROBLEM!!!
@@ -64,7 +67,7 @@ def generate_jth(G, zero_feature, remove_edges_every_layer=True):
     root_nodes = list(nx.nodes(JTG))
 
     # if G is a clique graph and it is not the original loopy graph
-    if len(nx.nodes(JTG)) == 1 and G.graph['original'] is False:
+    if len(nx.nodes(JTG)) == 1 and G.graph["original"] is False:
         GE = nx.create_empty_copy(G)
         return GE, list(nx.nodes(GE))  # returns G without any links
 
@@ -72,9 +75,8 @@ def generate_jth(G, zero_feature, remove_edges_every_layer=True):
     # Construct the JTHierarcyGraph:
     Clique_Nodes = list(nx.nodes(JTG))
     for Anode in Clique_Nodes:
-
         SG = nx.subgraph(G, JTG.nodes[Anode]["clique_has"])
-        SG.graph['original'] = False  # SG is a subgraph, not the original loopy graph
+        SG.graph["original"] = False  # SG is a subgraph, not the original loopy graph
 
         if len(nx.nodes(SG)) == 1:
             pass
@@ -117,8 +119,14 @@ def generate_jth(G, zero_feature, remove_edges_every_layer=True):
     return JTG, root_nodes
 
 
-def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, remove_edges_every_layer=True,
-                                 verbose=False):
+def generate_jth_with_root_nodes(
+    G,
+    Ktree,
+    zero_feature,
+    need_root_tree=False,
+    remove_edges_every_layer=True,
+    verbose=False,
+):
     """
     This function constructs a junction tree hierarchy tree for the graph G given root nodes stored in Ktree. Note: when
     calling this function from outside, make sure to run GenNodeLabels(G) to setup 'clique_has' and 'type' attributes
@@ -142,7 +150,9 @@ def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, r
     node_index_count = 0
 
     for clique in nx.find_cliques_recursive(Ktree):
-        Igraph.add_node(node_index_count, clique_has=list(clique), type="clique", x=zero_feature)
+        Igraph.add_node(
+            node_index_count, clique_has=list(clique), type="clique", x=zero_feature
+        )
         node_index_count += 1
 
     # Add edges to the Igraph - between two nodes if Cliques intersect
@@ -155,13 +165,19 @@ def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, r
 
     for NodeA in Igraph.nodes():
         for NodeB in Igraph.nodes():
-            if set(clique_has[NodeA]) != set(clique_has[NodeB]) and set(clique_has[NodeA]) & set(clique_has[NodeB]):
+            if set(clique_has[NodeA]) != set(clique_has[NodeB]) and set(
+                clique_has[NodeA]
+            ) & set(clique_has[NodeB]):
                 if need_root_tree is True:
-                    Igraph.add_edge(NodeA, NodeB, weight=len(set(clique_has[NodeA]) & set(clique_has[NodeB])))
+                    Igraph.add_edge(
+                        NodeA,
+                        NodeB,
+                        weight=len(set(clique_has[NodeA]) & set(clique_has[NodeB])),
+                    )
                 else:
                     Igraph.add_edge(NodeA, NodeB)
 
-            progress = 100 * iter_count / (L ** 2)
+            progress = 100 * iter_count / (L**2)
             # if math.floor(progress) > progress_threshold:
             #     progress_threshold = math.floor(progress)
             #     clear_output(wait=True)
@@ -169,7 +185,9 @@ def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, r
             if progress > progress_threshold + 5:
                 progress_threshold += 5
                 if verbose:
-                    print("Progress constructing JTH: ", progress_threshold, "/", "100 %")
+                    print(
+                        "Progress constructing JTH: ", progress_threshold, "/", "100 %"
+                    )
 
             iter_count += 1
     if verbose:
@@ -179,7 +197,9 @@ def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, r
 
     # Compute Junction Tree from Igraph by computing a max weight spanning tree with edge attribute 'weight'
     if need_root_tree is True:
-        jt_edges = nx.algorithms.tree.maximum_spanning_edges(Igraph, algorithm="kruskal", data=False)
+        jt_edges = nx.algorithms.tree.maximum_spanning_edges(
+            Igraph, algorithm="kruskal", data=False
+        )
         all_edges = JT.edges()
         JT.remove_edges_from(all_edges)
         for edge in jt_edges:
@@ -198,9 +218,8 @@ def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, r
     # Constructing JTH by calling JTGenerate recursively on clique nodes
     Clique_Nodes = list(nx.nodes(JTG))
     for Anode in Clique_Nodes:
-
         SG = nx.subgraph(G, JTG.nodes[Anode]["clique_has"])
-        SG.graph['original'] = False  # SG is a subgraph, not the original loopy graph
+        SG.graph["original"] = False  # SG is a subgraph, not the original loopy graph
 
         if len(nx.nodes(SG)) == 1:
             pass
@@ -246,8 +265,15 @@ def generate_jth_with_root_nodes(G, Ktree, zero_feature, need_root_tree=False, r
     return JTG, RootNodes
 
 
-def sample_and_generate_jth(G, k, zero_feature, copy_node_attributes=None, need_root_tree=False,
-                            remove_edges_every_layer=True, verbose=False):
+def sample_and_generate_jth(
+    G,
+    k,
+    zero_feature,
+    copy_node_attributes=None,
+    need_root_tree=False,
+    remove_edges_every_layer=True,
+    verbose=False,
+):
     """
     Sub-sample input graph G such that the treewidth is bounded by k
     :param G:       nx.Graph, an undirected graph
@@ -261,8 +287,12 @@ def sample_and_generate_jth(G, k, zero_feature, copy_node_attributes=None, need_
     """
     if G.number_of_nodes() <= k:
         if verbose:
-            print('Input graph only contains {} nodes. Skip sub-sampling.'.format(G.number_of_nodes()))
-        G.graph = {'original': True}
+            print(
+                "Input graph only contains {} nodes. Skip sub-sampling.".format(
+                    G.number_of_nodes()
+                )
+            )
+        G.graph = {"original": True}
         G = generate_node_labels(G)
         JTH, root_nodes = generate_jth(G, zero_feature=zero_feature)
         return G, JTH, root_nodes
@@ -270,8 +300,9 @@ def sample_and_generate_jth(G, k, zero_feature, copy_node_attributes=None, need_
     if verbose:
         tic = time.perf_counter()
         print("Sampling Graph")
-    G_sampled, Ktree = subsampling.bounded_treewidth_sampling(G, k=k, copy_node_attributes=copy_node_attributes,
-                                                              verbose=verbose)
+    G_sampled, Ktree = subsampling.bounded_treewidth_sampling(
+        G, k=k, copy_node_attributes=copy_node_attributes, verbose=verbose
+    )
     if verbose:
         toc = time.perf_counter()
         print("Done Sampling (time elapsed: {:.1f} min).".format((toc - tic) / 60))
@@ -287,15 +318,22 @@ def sample_and_generate_jth(G, k, zero_feature, copy_node_attributes=None, need_
         print("------------------------------------------")
         print("Constructing Junction Tree Hierarchy")
     G_sampled = generate_node_labels(G_sampled)
-    JTH, root_nodes = generate_jth_with_root_nodes(G_sampled, Ktree, zero_feature=zero_feature,
-                                                   need_root_tree=need_root_tree,
-                                                   remove_edges_every_layer=remove_edges_every_layer,
-                                                   verbose=verbose)
+    JTH, root_nodes = generate_jth_with_root_nodes(
+        G_sampled,
+        Ktree,
+        zero_feature=zero_feature,
+        need_root_tree=need_root_tree,
+        remove_edges_every_layer=remove_edges_every_layer,
+        verbose=verbose,
+    )
 
     if verbose:
         toc = time.perf_counter()
-        print("The Junction Tree Hierarchy has been successfully constructed (time elapsed: {:.1f} min).".format(
-            (toc - tic) / 60))
+        print(
+            "The Junction Tree Hierarchy has been successfully constructed (time elapsed: {:.1f} min).".format(
+                (toc - tic) / 60
+            )
+        )
         print("Nodes in original graph: ", len(G.nodes()))
         print("Edges in original graph: ", len(G.edges()))
         print("Edges in sampled graph: ", len(G_sampled.edges()))

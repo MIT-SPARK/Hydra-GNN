@@ -89,7 +89,6 @@ def cli():
 @click.argument("length", type=float)
 @click.option("--save-step", default=100, type=int)
 def run_est_gt(model_file, scene_path, output_path, seed, length, save_step=100):
-
     click.secho(f"Using seed {seed}", fg="green")
     scene_path = pathlib.Path(scene_path)
     output_path = pathlib.Path(output_path)
