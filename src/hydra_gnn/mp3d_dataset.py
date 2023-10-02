@@ -1,10 +1,11 @@
+"""Utilities for creating a MP3D dataset."""
 from hydra_gnn.preprocess_dsgs import (
     get_spark_dsg,
     get_room_object_dsg,
     convert_label_to_y,
     add_object_connectivity,
 )
-from neural_tree.construct import (
+from hydra_gnn.neural_tree.construct import (
     generate_htree,
     add_virtual_nodes_to_htree,
     nx_htree_to_torch,
@@ -27,8 +28,10 @@ EDGE_TYPES = [
 
 def heterogeneous_data_to_homogeneous(torch_data: HeteroData, removed_edge_type=None):
     """
-    Helper function to convert a pyg data from HeteroData to (homogeneous) Data.
-    The number of node features will be the maximum num of node features across all node types.
+    Convert a pyg data from HeteroData to (homogeneous) Data.
+
+    The number of node features will be the maximum num of node features across all
+    node types.
     """
     num_node_features = max(
         [torch_data[node_type].num_node_features for node_type in torch_data.x_dict]
@@ -68,8 +71,10 @@ def heterogeneous_data_to_homogeneous(torch_data: HeteroData, removed_edge_type=
 
 def heterogeneous_htree_to_homogeneous(torch_data: HeteroData):
     """
-    Helper function to convert an augmented htree from HeteroData to (homogeneous) Data.
-    The number of node features will be the maximum num of node features across all node types.
+    Convert an augmented htree from HeteroData to (homogeneous) Data.
+
+    The number of node features will be the maximum num of node features across
+    all node types.
     """
     assert "object_virtual" in torch_data.x_dict.keys()
     assert "room_virtual" in torch_data.x_dict.keys()
@@ -108,7 +113,7 @@ def heterogeneous_htree_to_homogeneous(torch_data: HeteroData):
     if "edge_attr" in torch_data:
         torch_data.edge_attr = torch_data.edge_attr[htree_edge_mask, :]
 
-    # set room_mask to show the original virtual nodes -- these are the classification nodes
+    # set room_mask to show original virtual nodes: these are the classification nodes
     torch_data.room_mask = torch_data.node_type == room_virutal_idx
     torch_data.object_mask = torch_data.node_type == object_virutal_idx
     return torch_data
@@ -116,7 +121,9 @@ def heterogeneous_htree_to_homogeneous(torch_data: HeteroData):
 
 class Hydra_mp3d_data:
     """
-    data class that takes in a hydra-mp3d trajectory, converts and stores torch data for training.
+    Data class for storing MP3D data.
+
+    Takes in a hydra-mp3d trajectory, converts and stores torch data for training.
     """
 
     def __init__(
@@ -128,6 +135,7 @@ class Hydra_mp3d_data:
         graph=None,
         expand_rooms=False,
     ):
+        """Construct a data class."""
         dsg = get_spark_dsg()
         if file_path:
             assert os.path.exists(file_path)
@@ -163,11 +171,11 @@ class Hydra_mp3d_data:
         min_iou_threshold=0.5,
         repartition_rooms=False,
     ):
-        """add room labels to room-object dsg using ground-truth mp3d house segmentation"""
+        """Add room labels to dsg using ground-truth mp3d house segmentation."""
         dsg, dsg_mp3d = get_spark_dsg(return_mp3d=True)
-        if (
-            repartition_rooms
-        ):  # repartition rooms (i.e. replace room nodes) with ground-truth room segmentation
+        if repartition_rooms:
+            # repartition rooms (i.e. replace room nodes) with ground-truth room
+            # segmentation
             self._G = dsg_mp3d.repartition_rooms(
                 self._G,
                 mp3d_info,
@@ -186,20 +194,21 @@ class Hydra_mp3d_data:
             )
 
         if room_removal_func is not None:
-            # change room semantic label to '\x15' (i.e. None) based on room_removal_func
+            # change room semantic label to '\x15' (i.e. None) based on
+            # room_removal_func
             for room in self._G_ro.get_layer(dsg.DsgLayers.ROOMS).nodes:
                 if room_removal_func(room):
                     room.attributes.semantic_label = ord("\x15")
 
     def remove_room_edges_in_dsg(self):
-        """remove room layer edges in self._Gro"""
+        """Remove room layer edges in self._Gro."""
         dsg = get_spark_dsg()
         room_edges = [edge for edge in self._G_ro.get_layer(dsg.DsgLayers.ROOMS).edges]
         for edge in room_edges:
             self._G_ro.remove_edge(edge.source, edge.target)
 
     def add_object_edges(self, threshold_near=2.0, max_near=2.0, max_on=0.2):
-        """add object connectivity to self._G_ro"""
+        """Add object connectivity to self._G_ro."""
         dsg = get_spark_dsg()
         assert (
             self._G_ro.get_layer(dsg.DsgLayers.OBJECTS).num_edges != 0
@@ -210,7 +219,11 @@ class Hydra_mp3d_data:
 
     @staticmethod
     def fill_missing_edge_index(torch_data, edge_types):
-        """helper function to fill missing edge types in torch_data to ensure all training data have the same edge_types"""
+        """
+        Fill missing edge types in torch_data.
+
+        Ensures all training data has the same edge_types.
+        """
         for source_type, edge_name, target_type in edge_types:
             if (
                 source_type,
@@ -224,7 +237,8 @@ class Hydra_mp3d_data:
                 torch_data[
                     source_type, edge_name, target_type
                 ].edge_index = torch.empty((2, 0), dtype=torch.int64)
-            # missing inter-type edges but can find edges in the other direction, fill with flipped edge_index
+            # missing inter-type edges but can find edges in the other direction,
+            # fill with flipped edge_index
             elif (
                 target_type,
                 "_".join(edge_name.split("_")[::-1]),
@@ -233,7 +247,8 @@ class Hydra_mp3d_data:
                 torch_data[source_type, edge_name, target_type].edge_index = torch_data[
                     target_type, "_".join(edge_name.split("_")[::-1]), source_type
                 ].edge_index.flip([0])
-            # missing inter-type edges without edges in the other direction, fill with empty edge_index
+            # missing inter-type edges without edges in the other direction, fill with
+            # empty edge_index
             else:
                 torch_data[
                     source_type, edge_name, target_type
@@ -247,7 +262,7 @@ class Hydra_mp3d_data:
         room_synonyms=[("a", "t"), ("z", "Z", "x", "p", "\x15")],
         double_precision=False,
     ):
-        """compute self._torch data by converting self._G_ro to torch data"""
+        """Compute self._torch data by converting self._G_ro to torch data."""
         # convert room-object dsg to torch graph
         self._torch_data = self._G_ro.to_torch(
             use_heterogeneous=use_heterogeneous,
@@ -269,6 +284,7 @@ class Hydra_mp3d_data:
         )
 
     def remove_last_features(self, dim):
+        """Drop last dim feature columns."""
         if self.is_heterogeneous():
             for node_type in self._torch_data.x_dict:
                 if self._torch_data[node_type].num_node_features >= dim:
@@ -280,7 +296,11 @@ class Hydra_mp3d_data:
                 self._torch_data.x = self._torch_data.x[:, :-dim]
 
     def compute_relative_pos(self):
-        """remove first three elements (3d pos) in x for each node and fill edge feature with relative pos"""
+        """
+        Remove first three elements (3d pos) in x for each node.
+
+        Fills edge feature with relative pos.
+        """
         if self._torch_data.edge_attr_dict:
             raise Warning(
                 "Cannot compute relative pos as edge_attr -- edge_attr is not empty."
@@ -299,6 +319,7 @@ class Hydra_mp3d_data:
             )
 
     def to_homogeneous(self):
+        """Convert to homogeneous graph."""
         if isinstance(self._torch_data, HeteroData):
             self._torch_data, node_types = heterogeneous_data_to_homogeneous(
                 self._torch_data
@@ -308,6 +329,7 @@ class Hydra_mp3d_data:
             )
 
     def num_graph_nodes(self):
+        """Get number of graph nodes."""
         if self.is_heterogeneous():
             return (
                 self._torch_data["rooms"].num_nodes
@@ -317,6 +339,7 @@ class Hydra_mp3d_data:
             return self._torch_data.num_nodes
 
     def num_node_features(self):
+        """Get number of node features."""
         if self._torch_data is None:
             return None
         elif self.is_heterogeneous():
@@ -328,23 +351,26 @@ class Hydra_mp3d_data:
             return self._torch_data.num_node_features
 
     def num_room_labels(self):
+        """Get possible number of room labels."""
         return max(self._room_label_dict.values()) + 1
 
     def num_object_labels(self):
+        """Get possible number of object labels."""
         return max(self._object_label_dict.values()) + 1
 
     def is_heterogeneous(self):
+        """Check if the graph is heterogeneous."""
         if self._torch_data is None:
-            raise RuntimeError(
-                "PyG data not found. Need to run compute_torch_data() first."
-            )
+            return None
         else:
             return isinstance(self._torch_data, HeteroData)
 
     def get_label_dict(self):
+        """Get labels for rooms and objects."""
         return {"objects": self._object_label_dict, "rooms": self._room_label_dict}
 
     def get_data_info(self):
+        """Return information about the underlying trajectory."""
         return {
             "scene_id": self._scene_id,
             "trajectory_id": self._trajectory_id,
@@ -353,20 +379,26 @@ class Hydra_mp3d_data:
         }
 
     def get_full_dsg(self):
+        """Get the original scene graph."""
         return self._G
 
     def get_room_object_dsg(self):
+        """Get the room-object scene graph."""
         return self._G_ro
 
     def get_torch_data(self):
+        """Get the converted pytorch data."""
         return self._torch_data
 
     def clear_dsg(self):
+        """Remove the underlying scene graphs."""
         self._G = None
         self._G_ro = None
 
 
 class Hydra_mp3d_htree_data(Hydra_mp3d_data):
+    """Class representing an H-Tree dataset."""
+
     def __init__(
         self,
         scene_id=0,
@@ -376,6 +408,7 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         graph=None,
         expand_rooms=False,
     ):
+        """Construct an H-Tree dataset for mp3d."""
         super(Hydra_mp3d_htree_data, self).__init__(
             scene_id, trajectory_id, num_frames, file_path, graph, expand_rooms
         )
@@ -390,7 +423,7 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         remove_room_semantic_feature=True,
         remove_clique_semantic_feature=True,
     ):
-        """compute self._torch data by converting self._G_ro to htree in torch data format"""
+        """Compute self._torch data by converting self._G_ro to htree."""
         # convert room-object dsg to torch dsg using parent class method
         Hydra_mp3d_data.compute_torch_data(
             self,
@@ -411,7 +444,8 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
             htree_aug_nx, double_precision=double_precision
         )
 
-        # remove redundant zero semantic features (assume it is a 300-dim and at then end of x)
+        # remove redundant zero semantic features (assume it is a 300-dim and
+        # at then end of x)
         if remove_room_semantic_feature:
             self._torch_data["room"].x = self._torch_data["room"].x[:, :-300]
             self._torch_data["room_virtual"].x = self._torch_data["room_virtual"].x[
@@ -425,12 +459,12 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
 
         # convert hydra semantic label to torch training label
         object_y = [
-            self._object_label_dict[l]
-            for l in self._torch_data["object_virtual"].label.tolist()
+            self._object_label_dict[lab]
+            for lab in self._torch_data["object_virtual"].label.tolist()
         ]
         room_y = [
-            self._room_label_dict[chr(l)]
-            for l in self._torch_data["room_virtual"].label.tolist()
+            self._room_label_dict[chr(lab)]
+            for lab in self._torch_data["room_virtual"].label.tolist()
         ]
 
         self._torch_data["object_virtual"].y = torch.tensor(object_y)
@@ -444,6 +478,7 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
         return toc - tic
 
     def num_graph_nodes(self):
+        """Get number of graph nodes."""
         if self.is_heterogeneous():
             return (
                 self._torch_data["room_virtual"].num_nodes
@@ -456,27 +491,35 @@ class Hydra_mp3d_htree_data(Hydra_mp3d_data):
             )
 
     def to_homogeneous(self):
+        """Convert graph to a homogeneous graph."""
         if isinstance(self._torch_data, HeteroData):
             self._torch_data = heterogeneous_htree_to_homogeneous(self._torch_data)
 
 
 class Hydra_mp3d_dataset(torch.utils.data.Dataset):
+    """Dataset with scene graphs from MP3D."""
+
     def __init__(self, split, remove_short_trajectories=False):
+        """Construct the dataset."""
         assert split in ("train", "val", "test"), "Invalid data split."
         self.split = split
         self._remove_short_trajectories = remove_short_trajectories
         self._data_list = []
 
     def __len__(self):
+        """Return the totla number of graphs."""
         return len(self._data_list)
 
     def __getitem__(self, item):
+        """Get a specific graph."""
         return self._data_list[item].get_torch_data()
 
     def get_data(self, item):
+        """Get a specific graph."""
         return self._data_list[item]
 
     def data_type(self):
+        """Get the underlying graph type."""
         if isinstance(self._data_list[0], Hydra_mp3d_htree_data):
             if self._data_list[0].is_heterogeneous():
                 return "heterogeneous_htree"
@@ -489,9 +532,11 @@ class Hydra_mp3d_dataset(torch.utils.data.Dataset):
                 return "homogeneous"
 
     def num_scenes(self):
+        """Get the total number of scenes in the dataset."""
         return len(set([data.get_data_info()["scene_id"] for data in self._data_list]))
 
     def add_data(self, data: Hydra_mp3d_data):
+        """Add another graph to the dataset."""
         if len(self._data_list) > 0:
             assert (
                 data.is_heterogeneous() == self._data_list[-1].is_heterogeneous()
@@ -517,7 +562,8 @@ class Hydra_mp3d_dataset(torch.utils.data.Dataset):
                 ),
                 None,
             )
-            # add input data to self._data_list if no data from this trajectory has been added
+            # add input data to self._data_list if no data from this trajectory has
+            # been added
             if index is None:
                 self._data_list.append(data)
             # update self._data_list if the input data has more frames than existing one
@@ -527,4 +573,5 @@ class Hydra_mp3d_dataset(torch.utils.data.Dataset):
                 self._data_list[index] = data
 
     def clear_dataset(self):
+        """Reset the dataset to contain nothing."""
         self._data_list = []

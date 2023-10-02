@@ -1,3 +1,4 @@
+"""Test graph pre-processing."""
 from hydra_gnn.preprocess_dsgs import (
     get_room_object_dsg,
     add_object_connectivity,
@@ -18,6 +19,7 @@ tol = 1e-5
 
 
 def test_get_room_object_dst(test_data_dir, tol=tol):
+    """Test that room-object graphs make sense."""
     test_json_file = test_data_dir / "x8F5xyUWy9e_0_gt_partial_dsg_1447.json"
     if not os.path.exists(test_json_file):
         warnings.warn(UserWarning("test data file missing. -- skip test"))
@@ -93,6 +95,7 @@ def test_get_room_object_dst(test_data_dir, tol=tol):
 
 
 def test_hydra_object_feature_converter(tol=tol):
+    """Test that converted object features make sense."""
     if pytest.colormap_data is None or pytest.word2vec_model is None:
         warnings.warn(UserWarning("data file(s) missing. -- skip test"))
         return
@@ -100,7 +103,8 @@ def test_hydra_object_feature_converter(tol=tol):
         colormap_data = pytest.colormap_data
         word2vec_model = pytest.word2vec_model
 
-    # feature converter should convert hydra integer label to the corresponding 300-dim word2vec feature vector
+    # feature converter should convert hydra integer label to the corresponding 300-dim
+    # word2vec feature vector
     feature_converter = hydra_object_feature_converter(colormap_data, word2vec_model)
     assert np.linalg.norm(feature_converter(3) - word2vec_model["chair"]) < tol
     assert (
@@ -121,6 +125,7 @@ def test_hydra_object_feature_converter(tol=tol):
 
 
 def test_full_torch_feature_conversion(test_data_dir, tol=tol):
+    """Test that features get constructed correctly."""
     test_json_file = test_data_dir / "x8F5xyUWy9e_0_gt_partial_dsg_1447.json"
     if not os.path.exists(test_json_file):
         warnings.warn(UserWarning("test data file missing. -- skip test"))
@@ -129,7 +134,7 @@ def test_full_torch_feature_conversion(test_data_dir, tol=tol):
     # read test hydra scene graph and extract room-object graph
     G = dsg.DynamicSceneGraph.load(str(test_json_file))
     G_ro = get_room_object_dsg(G, verbose=False)
-    add_object_connectivity(G_ro, threshold_near=2.0, threshold_on=1.0, max_near=2.0)
+    add_object_connectivity(G_ro, threshold_near=2.0, max_on=0.2, max_near=2.0)
 
     # setup 1: no semantic feature
     data_1 = G_ro.to_torch(
@@ -237,6 +242,7 @@ def test_full_torch_feature_conversion(test_data_dir, tol=tol):
 
 
 def test_convert_label_to_y(test_data_dir):
+    """Test that ground-truth labels get stored correctly."""
     test_json_file = test_data_dir / "x8F5xyUWy9e_0_gt_partial_dsg_1447.json"
     gt_house_file = test_data_dir / "x8F5xyUWy9e.house"
     if not (os.path.exists(test_json_file) and os.path.exists(gt_house_file)):
@@ -250,7 +256,8 @@ def test_convert_label_to_y(test_data_dir):
         colormap_data = pytest.colormap_data
         word2vec_model = pytest.word2vec_model
 
-    # read test hydra scene graph, add room label using gt segmentation, extract room-object graph
+    # read test hydra scene graph, add room label using gt segmentation,
+    # extract room-object graph
     G = dsg.DynamicSceneGraph.load(str(test_json_file))
     dsg.add_bounding_boxes_to_layer(G, dsg.DsgLayers.ROOMS)
     gt_house_info = load_mp3d_info(gt_house_file)

@@ -10,7 +10,7 @@ pip install pandas plotly networkx tensorboardX pyyaml
 ```
 This code is tested on PyTorch 1.12.1, PyTorch Geometric 2.2.0 with Cuda 11.3, and PyTorch 1.8.1, PyTorch Geometric 2.0.4 with Cuda 10.2.
 
-## H-tree Construction 
+## H-tree Construction
 by Rajat Talak
 
 ### Dataset
@@ -29,18 +29,18 @@ Put the dataset and pre-trained word2vec model in the folder ./data. It is organ
 
 ### Dataset nomenclature
 
-File ./datasets/mp3d.py contains the MP3D dataset code. 
+File ./datasets/mp3d.py contains the MP3D dataset code.
 MP3D(complete=True) will generate a dataset of full MP3D scenes.
 MP3D(complete=False) will generate a dataset of MP3D trajectory scenes.
 
 
-### Constructing H-tree 
+### Constructing H-tree
 
 ```bash
-cd neural_tree 
+cd neural_tree
 
 python -W ignore construct.py
 ```
 
-This will generate H-tree for all MP3D scenes. 
+This will generate H-tree for all MP3D scenes.
 By default, it will use the MP3D(complete=True) dataset. This can be changed in the construct.py code.

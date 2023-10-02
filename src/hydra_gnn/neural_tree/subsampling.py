@@ -1,8 +1,7 @@
+"""Subsampling utilities for H-Trees."""
 import networkx as nx
 import numpy as np
 import itertools
-
-# from IPython.display import clear_output
 
 # Input: Graph G and number k
 # output: Graph H, a subgraph of G with treewidth k

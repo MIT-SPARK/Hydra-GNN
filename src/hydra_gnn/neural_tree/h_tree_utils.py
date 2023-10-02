@@ -1,12 +1,9 @@
+"""Utilities for handling H-Trees during training."""
 import networkx as nx
 import torch
 import torch_geometric.utils as pyg_utils
 from torch_geometric.data import Data
 from copy import deepcopy
-
-import sys
-
-sys.path.append("../..")
 from neural_tree.h_tree import generate_jth, generate_node_labels
 
 

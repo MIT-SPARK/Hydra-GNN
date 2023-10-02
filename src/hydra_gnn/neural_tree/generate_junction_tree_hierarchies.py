@@ -1,10 +1,7 @@
+"""H-Tree utilities."""
 import networkx as nx
 import time
-
-import sys
-
-sys.path.append("../..")
-from neural_tree.h_tree import subsampling
+from hydra_gnn.neural_tree import subsampling
 
 
 def generate_clique_labels(G, clique_node):

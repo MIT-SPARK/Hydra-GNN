@@ -1,13 +1,11 @@
+"""Module to construct a H-Tree."""
 import networkx as nx
 import numpy as np
 import torch
 from torch_geometric.data import Data
 from torch_geometric.utils import to_networkx
 
-import sys
-
-sys.path.append("../")
-from neural_tree.h_tree.generate_junction_tree_hierarchies import (
+from hydra_gnn.neural_tree.generate_junction_tree_hierarchies import (
     sample_and_generate_jth,
 )
 

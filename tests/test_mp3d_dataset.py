@@ -1,3 +1,4 @@
+"""Test dataset construction for MP3D."""
 from hydra_gnn.preprocess_dsgs import (
     dsg_node_converter,
     hydra_object_feature_converter,
@@ -16,6 +17,7 @@ import pytest
 
 
 def test_Hydra_mp3d_data(test_data_dir):
+    """Test that conversion works as expected."""
     test_json_file = test_data_dir / "x8F5xyUWy9e_0_gt_partial_dsg_1447.json"
     gt_house_file = test_data_dir / "x8F5xyUWy9e.house"
     if not (os.path.exists(test_json_file) and os.path.exists(gt_house_file)):
@@ -60,7 +62,7 @@ def test_Hydra_mp3d_data(test_data_dir):
     data.add_dsg_room_labels(gt_house_info, angle_deg=-90)
 
     assert data.get_room_object_dsg().get_layer(dsg.DsgLayers.OBJECTS).num_edges() == 0
-    data.add_object_edges(threshold_near=2.0, threshold_on=1.0, max_near=2.0)
+    data.add_object_edges(threshold_near=2.0, max_on=0.2, max_near=2.0)
     assert data.get_room_object_dsg().get_layer(dsg.DsgLayers.OBJECTS).num_edges() > 0
 
     # load data info
@@ -139,6 +141,7 @@ def test_Hydra_mp3d_data(test_data_dir):
 
 
 def test_fill_missing_edge_index():
+    """Test room edge logic."""
     # data with 1 room
     data = HeteroData()
     data["rooms"].x = torch.rand((1, 6))
@@ -178,6 +181,7 @@ def test_fill_missing_edge_index():
 
 
 def test_Hydra_mp3d_dataset(test_data_dir):
+    """Test resultant pytorch geometric dataset."""
     test_json_file1 = test_data_dir / "x8F5xyUWy9e_0_gt_partial_dsg_1447.json"
     test_json_file2 = test_data_dir / "17DRP5sb8fy_0_gt_partial_dsg_1414.json"
     gt_house_file1 = test_data_dir / "x8F5xyUWy9e.house"
@@ -242,7 +246,7 @@ def test_Hydra_mp3d_dataset(test_data_dir):
         )
         gt_house_info1 = load_mp3d_info(gt_house_file1)
         data1.add_dsg_room_labels(gt_house_info1, angle_deg=-90)
-        data1.add_object_edges(threshold_near=2.0, threshold_on=1.0, max_near=2.0)
+        data1.add_object_edges(threshold_near=2.0, max_on=0.2, max_near=2.0)
         data1.compute_torch_data(
             use_heterogeneous=True,
             node_converter=dsg_node_converter(
@@ -251,7 +255,7 @@ def test_Hydra_mp3d_dataset(test_data_dir):
         )
         gt_house_info2 = load_mp3d_info(gt_house_file2)
         data2.add_dsg_room_labels(gt_house_info2, angle_deg=-90)
-        data2.add_object_edges(threshold_near=2.0, threshold_on=1.0, max_near=2.0)
+        data2.add_object_edges(threshold_near=2.0, max_on=0.2, max_near=2.0)
         data2.compute_torch_data(
             use_heterogeneous=True,
             node_converter=dsg_node_converter(
