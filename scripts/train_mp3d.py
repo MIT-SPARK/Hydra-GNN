@@ -1,5 +1,6 @@
+"""Run training for mp3d."""
 from hydra_gnn.utils import (
-    PROJECT_DIR,
+    project_dir,
     MP3D_BENCHMARK_DIR,
     HYDRA_TRAJ_DIR,
     plist,
@@ -12,14 +13,14 @@ from hydra_gnn.base_training_job import BaseTrainingJob
 from torch_geometric.loader import DataLoader
 import random
 from statistics import mean
-import os
+import click
 import shutil
-import argparse
 import pickle
 import yaml
 import torch
 import numpy as np
 import pandas as pd
+import pathlib
 from pprint import pprint
 
 
@@ -37,79 +38,87 @@ param_dict_list = pgrid(
 )
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--task_id", default=0, type=int, help="slurm array task ID")
-    parser.add_argument(
-        "--num_tasks", default=1, type=int, help="total number of slurm array tasks"
-    )
-    parser.add_argument(
-        "--gpu_index", default=-1, type=int, help="gpu index (default: task_id)"
-    )
-    parser.add_argument(
-        "--config_file",
-        default=os.path.join(PROJECT_DIR, "config/mp3d_default_config.yaml"),
-        help="training config file",
-    )
-    parser.add_argument(
-        "--train_val_ratio",
-        default=None,
-        type=float,
-        nargs=2,
-        help="training and validation ratio",
-    )
-    parser.add_argument(
-        "--same_val_test",
-        action="store_true",
-        help="use the same scenes for validation and testing (trajctory 0-1 for validation, 2-4 for testing)",
-    )
-    parser.add_argument(
-        "--remove_word2vec",
-        action="store_true",
-        help="remove word2vec features from node features (assuming it is at the end of the feature vector)",
-    )
-    parser.add_argument(
-        "--single_experiment",
-        action="store_true",
-        help="run single experiment using config file instead of parameter sweep",
-    )
-    args = parser.parse_args()
-
+@click.command()
+@click.option("--task_id", default=0, type=int, help="slurm array task ID")
+@click.option(
+    "--num_tasks", default=1, type=int, help="total number of slurm array tasks"
+)
+@click.option("--gpu_index", default=-1, type=int, help="gpu index (default: task_id)")
+@click.option(
+    "--config_dir", default=str(project_dir() / "config"), help="training config dir"
+)
+@click.option(
+    "-c",
+    "--config_name",
+    default="mp3d_default_config.yaml",
+    help="training config file",
+)
+@click.option(
+    "--train_val_ratio",
+    default=None,
+    type=float,
+    nargs=2,
+    help="training and validation ratio",
+)
+@click.option(
+    "--same_val_test",
+    is_flag=True,
+    help="split val/test by trajectory (trajctory 0-1 for validation, 2-4 for testing)",
+)
+@click.option(
+    "--remove_word2vec",
+    is_flag=True,
+    help="remove word2vec features from node features",
+)
+@click.option(
+    "--single_experiment",
+    is_flag=True,
+    help="run single experiment using config file instead of parameter sweep",
+)
+def main(
+    task_id,
+    num_tasks,
+    gpu_index,
+    config_dir,
+    config_name,
+    train_val_ratio,
+    same_val_test,
+    remove_word2vec,
+    single_experiment,
+):
+    """Run training for mp3d."""
     print(f"cuda available: {torch.cuda.is_available()}")
+    config_file = pathlib.Path(config_dir).expanduser().absolute() / config_name
 
     # parse config file
-    with open(args.config_file, "r") as input_file:
+    with open(config_file, "r") as input_file:
         config = yaml.safe_load(input_file)
-    task_id = args.task_id
-    num_tasks = args.num_tasks
-    gpu_index = args.gpu_index if args.gpu_index != -1 else task_id
-    dataset_path = os.path.join(PROJECT_DIR, config["data"]["file_path"])
-    output_dir = os.path.join(PROJECT_DIR, config["logger"]["output_dir"])
+    gpu_index = gpu_index if gpu_index != -1 else task_id
+    dataset_path = project_dir() / config["data"]["file_path"]
+    output_dir = project_dir() / config["logger"]["output_dir"]
     assert task_id < num_tasks
 
     # setup log folder, accuracy files
     print(f"output direcotry: {output_dir}")
-    if os.path.exists(output_dir):
+    if output_dir.exists():
         print("Existing contents might be over-written.")
-        # if task_id == 0:
-        #     input("Output directory exists. Existing contents might be over-written. Press any key to proceed...")
     else:
-        os.mkdir(output_dir)
+        output_dir.mkdir(parents=True)
 
     # load data and data split
-    if args.train_val_ratio is None:
+    if train_val_ratio is None:
         print("Preparing training data using default mp3d split.")
         split_dict = read_mp3d_split(MP3D_BENCHMARK_DIR)
     else:
         print("Preparing training data using specified split ratio.")
         random.seed(0)
         split_dict = generate_mp3d_split(
-            HYDRA_TRAJ_DIR, args.train_val_ratio[0], args.train_val_ratio[1]
+            HYDRA_TRAJ_DIR, train_val_ratio[0], train_val_ratio[1]
         )
-    if args.same_val_test:
-        print(
-            "Regenerating val/test split using trajectories -- 0-1 for training and 2-4 for testing."
-        )
+
+    if same_val_test:
+        print("Regenerating val/test split using trajectories!")
+        print("Using 0-1 for training and 2-4 for testing")
 
     # create data lists
     dataset_dict = {
@@ -119,14 +128,17 @@ if __name__ == "__main__":
     }
     with open(dataset_path, "rb") as input_file:
         data_list = pickle.load(input_file)
+
     if config["network"]["conv_block"] == "GAT_edge":
         [data.compute_relative_pos() for data in data_list]
+
     if config["data"]["type"] == "homogeneous":
         [data.to_homogeneous() for data in data_list]
-    if args.remove_word2vec:
+
+    if remove_word2vec:
         [data.remove_last_features(300) for data in data_list]
 
-    if args.same_val_test:
+    if same_val_test:
         for data in data_list:
             if data.get_data_info()["scene_id"] in split_dict["scenes_train"]:
                 dataset_dict["train"].add_data(data)
@@ -151,16 +163,13 @@ if __name__ == "__main__":
                 raise RuntimeError(
                     f"Founnd invalid scene id in input data file {dataset_path}."
                 )
-    print(
-        f"  training: {dataset_dict['train'].num_scenes()} scenes {len(dataset_dict['train'])} graphs\n"
-        f"  validation: {dataset_dict['val'].num_scenes()} scenes {len(dataset_dict['val'])} graphs\n"
-        f"  test: {dataset_dict['test'].num_scenes()} scenes {len(dataset_dict['test'])} graphs"
-    )
 
-    # master output directory
-    # dt_str = datetime.datetime.now().strftime('%m%d%H%M')
-    # experiment_output_dir = os.path.join(output_dir, dt_str)
-    # os.mkdir(experiment_output_dir)
+    def _stats(datasets, split):
+        return f"{datasets[split].num_scenes()} scenes {len(datasets[split])} graphs"
+
+    print(f"  training: {_stats(dataset_dict, 'train')}")
+    print(f"  validation: {_stats(dataset_dict, 'val')}")
+    print(f"  test: {_stats(dataset_dict, 'test')}")
 
     # log resutls
     log_params = list(param_dict_list[0].keys())
@@ -173,26 +182,24 @@ if __name__ == "__main__":
     )
 
     # run experiment
-    if args.single_experiment:
+    if single_experiment:
         experiment_id_list = [0]
     else:
         num_param_set = len(param_dict_list)
         experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
 
     for experiment_i in experiment_id_list:
-        if args.single_experiment:
-            print(f"\nUse all parameters in config: {args.config_file}")
-            experiment_output_dir_i = os.path.join(output_dir, "experiment")
-            config_output_path_i = os.path.join(output_dir, "config.yaml")
-            accuracy_file_path = os.path.join(output_dir, "accuracy.csv")
+        if single_experiment:
+            print(f"\nUse all parameters in config: {config_file}")
+            experiment_output_dir_i = output_dir / "experiment"
+            config_output_path_i = output_dir / "config.yaml"
+            accuracy_file_path = output_dir / "accuracy.csv"
             param_list = ["-"] * len(log_params)
         else:
             print(f"\nExperiment {experiment_i+1} / {len(param_dict_list)}")
-            experiment_output_dir_i = os.path.join(
-                output_dir, f"experiment_{experiment_i}"
-            )
-            config_output_path_i = os.path.join(experiment_output_dir_i, "config.yaml")
-            accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
+            experiment_output_dir_i = output_dir / f"experiment_{experiment_i}"
+            config_output_path_i = experiment_output_dir_i / "config.yaml"
+            accuracy_file_path = output_dir / f"accuracy-{task_id}.csv"
             param_dict = param_dict_list[experiment_i]
             param_list = [param_dict[key] for key in log_params]
             if config["network"]["conv_block"][:3] == "GAT":
@@ -219,13 +226,14 @@ if __name__ == "__main__":
             pprint(config)
 
         # clean up tensorboard output directory
-        if os.path.exists(experiment_output_dir_i):
+        if experiment_output_dir_i.exists():
             shutil.rmtree(experiment_output_dir_i)
             print(f"Overwritting experiment output folder {experiment_output_dir_i}")
-        os.mkdir(experiment_output_dir_i)
+
+        experiment_output_dir_i.mkdir(parents=True)
 
         # save config
-        with open(config_output_path_i, "w") as output_file:
+        with config_output_path_i.open("w") as output_file:
             yaml.dump(config, output_file, default_flow_style=False)
 
         # run experiment
@@ -253,7 +261,7 @@ if __name__ == "__main__":
             test_time_list.append(info["test_time"])
 
             # log per label accuracy for single experiment
-            if args.single_experiment:
+            if single_experiment:
                 train_accuracy, train_accuracy_matrix = train_job.test(
                     DataLoader(train_job.get_dataset("train"), batch_size=4096), True
                 )
@@ -269,12 +277,11 @@ if __name__ == "__main__":
                 assert (
                     abs(test_accuracy - best_acc[1]) < 0.001
                 ), f"{test_accuracy}, {best_acc[1]}"
-                # output_header = "num_labels[train],num_tp[train],num_fp[train],num_labels[val],num_tp[val],num_fp[val],num_labels[test],num_tp[test],num_fp[test]"
                 num_labels = train_accuracy_matrix.shape[1]
                 output_header = (
-                    [f"{l}[train]" for l in range(num_labels)]
-                    + [f"{l}[val]" for l in range(num_labels)]
-                    + [f"{l}[test]" for l in range(num_labels)]
+                    [f"{lab}[train]" for lab in range(num_labels)]
+                    + [f"{lab}[val]" for lab in range(num_labels)]
+                    + [f"{lab}[test]" for lab in range(num_labels)]
                 )
                 output_header = ",".join(output_header)
                 np.savetxt(
@@ -306,6 +313,11 @@ if __name__ == "__main__":
             ]
         )
         df = pd.concat([df, pd.DataFrame(data=[output_data_list], columns=df.columns)])
-        if not args.single_experiment:
+        if not single_experiment:
             df["GAT_concat"] = df["GAT_concat"].astype(bool)
+
         df.to_csv(accuracy_file_path, index=False)
+
+
+if __name__ == "__main__":
+    main()

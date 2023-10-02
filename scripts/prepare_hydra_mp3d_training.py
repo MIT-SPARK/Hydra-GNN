@@ -92,6 +92,9 @@ def main(
     if output_path.exists():
         input("Output data file exists. Press any key to proceed...")
 
+    if not output_path.parent.exists():
+        output_path.parent.mkdir(parents=True)
+
     colormap_data = pd.read_csv(COLORMAP_DATA_PATH, delimiter=",")
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(
         WORD2VEC_MODEL_PATH, binary=True
