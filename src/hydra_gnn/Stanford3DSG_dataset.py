@@ -5,7 +5,7 @@ from hydra_gnn.mp3d_dataset import (
     heterogeneous_htree_to_homogeneous,
 )
 from hydra_gnn.preprocess_dsgs import get_spark_dsg
-from neural_tree.construct import (
+from hydra_gnn.neural_tree.construct import (
     generate_htree,
     add_virtual_nodes_to_htree,
     nx_htree_to_torch,

@@ -1,19 +1,19 @@
-from hydra_gnn.utils import PROJECT_DIR, plist, pgrid, update_existing_keys
+"""Train stanford3d."""
+from hydra_gnn.utils import project_dir, plist, pgrid
 from hydra_gnn.Stanford3DSG_dataset import Stanford3DSG_htree_data, Stanford3DSG_dataset
 from hydra_gnn.semisupervised_training_job import SemiSupervisedTrainingJob
 from statistics import mean, stdev
-import os
+import click
 import shutil
-import argparse
 import pickle
 import yaml
 import torch
-import numpy as np
+import pathlib
 import pandas as pd
 from pprint import pprint
 
 
-# parameter sweep setup (note: last GAT hidden_dims is label dim and therefore not specified)
+# parameter sweep setup (note: last GAT hidden_dims is label dim and not specified)
 GAT_hidden_dims = plist("GAT_hidden_dims", [[64, 64], [128, 128]])
 GAT_head = plist("GAT_head", [6])  # same number of head in each conv layer
 GAT_concat = plist(
@@ -27,54 +27,60 @@ param_dict_list = pgrid(
 )
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--task_id", default=0, type=int, help="slurm array task ID")
-    parser.add_argument(
-        "--num_tasks", default=1, type=int, help="total number of slurm array tasks"
-    )
-    parser.add_argument(
-        "--gpu_index", default=-1, type=int, help="gpu index (default: task_id)"
-    )
-    parser.add_argument(
-        "--config_file",
-        default=os.path.join(PROJECT_DIR, "config/Stanford3DSG_default_config.yaml"),
-        help="training config file",
-    )
-    parser.add_argument(
-        "--train_val_ratio",
-        default=(0.7, 0.1),
-        type=float,
-        nargs=2,
-        help="training and validation ratio",
-    )
-    parser.add_argument(
-        "--single_experiment",
-        action="store_true",
-        help="run single experiment using config file instead of parameter sweep",
-    )
-    args = parser.parse_args()
-
+@click.command()
+@click.option("--task_id", default=0, type=int, help="slurm array task ID")
+@click.option(
+    "--num_tasks", default=1, type=int, help="total number of slurm array tasks"
+)
+@click.option("--gpu_index", default=-1, type=int, help="gpu index (default: task_id)")
+@click.option(
+    "--config_dir", default=str(project_dir() / "config"), help="training config dir"
+)
+@click.option(
+    "-c",
+    "--config_name",
+    default="Stanford3DSG_default_config.yaml",
+    help="training config file",
+)
+@click.option(
+    "--train_val_ratio",
+    default=(0.7, 0.1),
+    type=float,
+    nargs=2,
+    help="training and validation ratio",
+)
+@click.option(
+    "--single_experiment",
+    is_flag=True,
+    help="run single experiment using config file instead of parameter sweep",
+)
+def main(
+    task_id,
+    num_tasks,
+    gpu_index,
+    config_dir,
+    config_name,
+    train_val_ratio,
+    single_experiment,
+):
+    """Run stanford3d training."""
     print(f"cuda available: {torch.cuda.is_available()}")
+    config_file = pathlib.Path(config_dir).expanduser().absolute() / config_name
 
     # parse config file
-    with open(args.config_file, "r") as input_file:
+    with config_file.open("r") as input_file:
         config = yaml.safe_load(input_file)
-    task_id = args.task_id
-    num_tasks = args.num_tasks
-    gpu_index = args.gpu_index if args.gpu_index != -1 else task_id
-    dataset_path = os.path.join(PROJECT_DIR, config["data"]["file_path"])
-    output_dir = os.path.join(PROJECT_DIR, config["logger"]["output_dir"])
+    gpu_index = gpu_index if gpu_index != -1 else task_id
+    dataset_path = project_dir() / config["data"]["file_path"]
+    output_dir = project_dir() / config["logger"]["output_dir"]
     assert task_id < num_tasks
 
     # setup log folder, accuracy files
-    print(f"output direcotry: {output_dir}")
-    if os.path.exists(output_dir):
-        print("Existing contents might be over-written.")
-        # if task_id == 0:
-        #     input("Output directory exists. Existing contents might be over-written. Press any key to proceed...")
+    print(f"output directory: {output_dir}")
+    if output_dir.exists():
+        print("Existing contents may be overwritten.")
     else:
-        os.mkdir(output_dir)
+        output_dir.mkdir(parents=True)
 
     # load data and prepare dataset
     dataset = Stanford3DSG_dataset()
@@ -105,31 +111,29 @@ if __name__ == "__main__":
     )
 
     # node split
-    train_ratio, val_ratio = args.train_val_ratio[0], args.train_val_ratio[1]
+    train_ratio, val_ratio = train_val_ratio[0], train_val_ratio[1]
     test_ratio = 1 - train_ratio - val_ratio
     print(f"Train val test split ratio: {train_ratio} : {val_ratio} : {test_ratio}")
 
     # run experiment
-    if args.single_experiment:
+    if single_experiment:
         experiment_id_list = [0]
     else:
         num_param_set = len(param_dict_list)
         experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
 
     for experiment_i in experiment_id_list:
-        if args.single_experiment:
-            print(f"\nUse all parameters in config: {args.config_file}")
-            experiment_output_dir_i = os.path.join(output_dir, "experiment")
-            config_output_path = os.path.join(output_dir, "config.yaml")
-            accuracy_file_path = os.path.join(output_dir, "accuracy.csv")
+        if single_experiment:
+            print(f"\nUse all parameters in config: {config_file}")
+            experiment_output_dir_i = output_dir / "experiment"
+            config_output_path = output_dir / "config.yaml"
+            accuracy_file_path = output_dir / "accuracy.csv"
             param_list = ["-"] * len(log_params)
         else:
             print(f"\nExperiment {experiment_i+1} / {len(param_dict_list)}")
-            experiment_output_dir_i = os.path.join(
-                output_dir, f"experiment_{experiment_i}"
-            )
-            config_output_path = os.path.join(experiment_output_dir_i, "config.yaml")
-            accuracy_file_path = os.path.join(output_dir, f"accuracy-{task_id}.csv")
+            experiment_output_dir_i = output_dir / f"experiment_{experiment_i}"
+            config_output_path = experiment_output_dir_i / "config.yaml"
+            accuracy_file_path = output_dir / f"accuracy-{task_id}.csv"
             # update parameter
             param_dict = param_dict_list[experiment_i]
             param_list = [param_dict[key] for key in log_params]
@@ -154,13 +158,13 @@ if __name__ == "__main__":
         pprint(config)
 
         # clean up tensorboard output directory
-        if os.path.exists(experiment_output_dir_i):
+        if experiment_output_dir_i.exists():
             shutil.rmtree(experiment_output_dir_i)
             print(f"Overwritting experiment output folder {experiment_output_dir_i}")
-        os.mkdir(experiment_output_dir_i)
+        experiment_output_dir_i.mkdir(parents=True)
 
         # save config
-        with open(config_output_path, "w") as output_file:
+        with config_output_path.open("w") as output_file:
             yaml.dump(config, output_file, default_flow_style=False)
 
         # run experiment
@@ -193,7 +197,7 @@ if __name__ == "__main__":
             test_time_list.append(info["test_time"])
 
             # save type separated accuracy for single experiment
-            if args.single_experiment:
+            if single_experiment:
                 val_room_accuracy, val_object_accuracy = train_job.test(
                     mask_name="val_mask", get_type_separated_accuracy=True
                 )
@@ -218,11 +222,11 @@ if __name__ == "__main__":
             ]
         )
         df = pd.concat([df, pd.DataFrame(data=[output_data_list], columns=df.columns)])
-        df.to_csv(accuracy_file_path, index=False)
+        df.to_csv(str(accuracy_file_path), index=False)
 
         # save type separated accuracy for single experiment
-        if args.single_experiment:
-            with open(accuracy_file_path, "a") as output_file:
+        if single_experiment:
+            with accuracy_file_path.open("a") as output_file:
                 print(
                     f"\nValidation accuracy: {mean(val_accuracy_list)} +/- {stdev(val_accuracy_list)}",
                     file=output_file,
@@ -248,3 +252,7 @@ if __name__ == "__main__":
                     f"    object: {mean(test_object_accuracy_list)} +/- {stdev(test_object_accuracy_list)}",
                     file=output_file,
                 )
+
+
+if __name__ == "__main__":
+    main()

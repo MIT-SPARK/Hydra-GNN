@@ -3,7 +3,7 @@ from hydra_gnn.models.utils import (
     build_GAT_hetero_conv,
     cross_entropy_loss,
 )
-from neural_tree.construct import (
+from hydra_gnn.neural_tree.construct import (
     HTREE_NODE_TYPES,
     HTREE_EDGE_TYPES,
     HTREE_INIT_EDGE_TYPES,

@@ -1,4 +1,5 @@
-from neural_tree.construct import HTREE_NODE_TYPES, HTREE_EDGE_TYPES
+"""Path utilities."""
+from hydra_gnn.neural_tree.construct import HTREE_NODE_TYPES, HTREE_EDGE_TYPES
 import numpy as np
 import torch_geometric
 from torch_geometric.utils import to_networkx
@@ -11,32 +12,43 @@ from networkx.algorithms.approximation.treewidth import (
 )
 import plotly.graph_objects as go
 import plotly.express as px
-import os.path
 from typing import Any, Sequence, Iterator
 from io import IOBase
 import itertools
+import pathlib
 
 
-PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR = os.path.join(PROJECT_DIR, "data")
-MP3D_BENCHMARK_DIR = os.path.join(DATA_DIR, "mp3d_benchmark")
-MP3D_HOUSE_DIR = os.path.join(DATA_DIR, "house_files")
-MP3D_OBJECT_LABEL_DATA_PATH = os.path.join(DATA_DIR, "mpcat40.tsv")
-HYDRA_TRAJ_DIR = os.path.join(DATA_DIR, "tro_graphs_2022_09_24")
-COLORMAP_DATA_PATH = os.path.join(DATA_DIR, "colormap.csv")
-STANFORD3DSG_DATA_DIR = os.path.join(
-    PROJECT_DIR, "data/Stanford3DSceneGraph/tiny/verified_graph"
-)
-STANFORD3DSG_GRAPH_PATH = os.path.join(PROJECT_DIR, "data/Stanford3DSG.pkl")
-WORD2VEC_MODEL_PATH = os.path.join(DATA_DIR, "GoogleNews-vectors-negative300.bin")
+def project_dir():
+    """Get project directory."""
+    pkg_path = pathlib.Path(__file__).absolute().parent
+    return pkg_path.parent.parent
+
+
+def data_dir():
+    """Get data directory."""
+    return project_dir() / "data"
+
+
+PROJECT_DIR = str(project_dir())
+DATA_DIR = str(data_dir())
+MP3D_BENCHMARK_DIR = str(data_dir() / "mp3d_benchmark")
+MP3D_HOUSE_DIR = str(data_dir() / "house_files")
+MP3D_OBJECT_LABEL_DATA_PATH = str(data_dir() / "mpcat40.tsv")
+HYDRA_TRAJ_DIR = str(data_dir() / "tro_graphs_2022_09_24")
+COLORMAP_DATA_PATH = str(data_dir() / "colormap.csv")
+STANFORD3DSG_DATA_DIR = str(data_dir() / "Stanford3DSceneGraph/tiny/verified_graph")
+STANFORD3DSG_GRAPH_PATH = str(data_dir() / "Stanford3DSG.pkl")
+WORD2VEC_MODEL_PATH = str(data_dir() / "GoogleNews-vectors-negative300.bin")
 
 
 def print_log(string, file):
+    """Print and log message to file."""
     print(string)
     print(string, file=file)
 
 
 def update_existing_keys(dict_to_update, dict_input):
+    """Copy values over if key previously existed."""
     dict_to_update.update(
         {k: v for k, v in dict_input.items() if k in dict_to_update.keys()}
     )
