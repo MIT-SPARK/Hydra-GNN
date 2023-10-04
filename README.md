@@ -97,10 +97,16 @@ python scripts/train_mp3d.py
 
 ## Running with Hydra
 
+We provide pre-trained models [here](https://drive.google.com/drive/folders/1OgQOLYKUg5nRdZnfWQsFspBd7HEV5ZyW?usp=sharing)
 
 First, start the GNN model via
 ```
 ./bin/room_classification_server server path/to/pretrained/model path/to/hydra/label/space
+```
+
+For the uhumans2 office, this would look like
+```
+./bin/room_classification_server server path/to/pretrained/model path/to/hydra/config/uhumans2/uhumans2_office_typology.yaml
 ```
 
 Then, start Hydra with the `use_zmq_interface:=true` argument. For the uhumans2 office scene, this would look like:
