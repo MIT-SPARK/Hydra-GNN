@@ -1,10 +1,10 @@
 """Plot object and room treewidths."""
+import click
 import pickle
 import pandas as pd
 import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
-import sys
 import pathlib
 
 
@@ -67,13 +67,15 @@ def _plot_treewidth(df, output_path, filename):
         plt.show()
 
 
-def main():
+@click.command()
+@click.option("-o", "--output", default=None)
+def main(output):
     """Plot room and object tree-width."""
     object_df = _load_df(["mp3dnew_objects.pkl"], ["Matterport3D"])
     room_df = _load_df(["mp3dnew_rooms.pkl"], ["Matterport3D"])
 
-    if len(sys.argv) > 1:
-        output_path = pathlib.Path(sys.argv[1]).expanduser().absolute()
+    if output:
+        output_path = pathlib.Path(output).expanduser().absolute()
     else:
         output_path = None
 
