@@ -3,7 +3,7 @@ It is based on the papers:
   - ["Neural Trees for Learning on Graphs"](https://proceedings.neurips.cc/paper/2021/file/ddf88ea64eaed0f3de5531ac964a0a1a-Paper.pdf)
   - ["Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems"](https://arxiv.org/abs/2305.07154)
 
-If you find this code relevant for your work, please consider citing one or both of these papers. A bibtex entry is provided below:
+If you find this code relevant for your work, please consider citing one or both of these papers. Bibtex entries are provided below:
 
 ```
 @inproceedings{talak2021neuraltree,
@@ -86,7 +86,7 @@ python scripts/prepare_Stanford3DSG_for_training.py
 
 You can examine both scripts with `--help` to view possible arguments.
 
-Training for a specific dataset can be ran via
+Training for a specific dataset can be run via
 ```
 python scripts/train_Stanford.py
 ```
@@ -97,7 +97,16 @@ python scripts/train_mp3d.py
 
 ## Running with Hydra
 
-TBD
+
+First, start the GNN model via
+```
+./bin/room_classification_server server path/to/pretrained/model path/to/hydra/label/space
+```
+
+Then, start Hydra with the `use_zmq_interface:=true` argument. For the uhumans2 office scene, this would look like:
+```
+roslaunch hydra_ros uhumans2.launch use_zmq_interface:=true
+```
 
 ## Authorship
 

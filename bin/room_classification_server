@@ -12,6 +12,7 @@ import yaml
 from dataclasses import dataclass
 import time
 
+from hydra_gnn.utils import WORD2VEC_MODEL_PATH
 from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data
 import hydra_gnn.models
 from hydra_gnn.preprocess_dsgs import dsg_node_converter, _get_label_dict
@@ -97,14 +98,14 @@ def get_label_embedding_path(typology_path):
     return pathlib.Path(__file__).absolute().parent / f".{typology_path.stem}.pkl"
 
 
-def dump_word2vec(word2vec, typology_path):
+def dump_word2vec(typology_path):
     """Dump word2vec embeddings for a typology file."""
     click.secho(f"generating w2v embedding for {typology_path}", fg="green")
 
     import gensim.models
 
     word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(
-        word2vec, binary=True
+        WORD2VEC_MODEL_PATH, binary=True
     )
 
     typology_path = pathlib.Path(typology_path).expanduser().absolute()
@@ -134,14 +135,14 @@ def _zero_feature(x, dim=300):
     return np.zeros(dim)
 
 
-def get_label_conversion(word2vec, typology_path, use_word2vec=True):
+def get_label_conversion(typology_path, use_word2vec=True):
     """Get function to convert semantic labels to node features."""
     if not use_word2vec:
         return lambda x: _zero_feature(x, dim=300)
 
     pkl_path = get_label_embedding_path(typology_path)
     if not pkl_path.exists():
-        dump_word2vec(word2vec, typology_path)
+        dump_word2vec(typology_path)
 
     with pkl_path.open("rb") as fin:
         embedding_map = pickle.load(fin)
@@ -187,7 +188,7 @@ class RoomLabelConverter:
 class GnnModel:
     """Class to hold stuff regarding inference."""
 
-    def __init__(self, model_path, word2vec_path, typology_path, device=None):
+    def __init__(self, model_path, typology_path, device=None):
         """Load everything."""
         param_path = model_path / "model.yaml"
         weight_path = model_path / "model_weights.pth"
@@ -201,7 +202,7 @@ class GnnModel:
 
         self.model = self.model_info.model_class(**model_param["network_params"])
         self.model.load_state_dict(torch.load(weight_path))
-        self.label_converter = get_label_conversion(word2vec_path, typology_path)
+        self.label_converter = get_label_conversion(typology_path)
 
         self.device = device
         self.model.to(self.device)
@@ -310,7 +311,6 @@ def _get_device():
 
 @main.command(name="server")
 @click.argument("model_path", type=click.Path(exists=True))
-@click.argument("word2vec_path", type=click.Path(exists=True))
 @click.argument("typology_path", type=click.Path(exists=True))
 @click.option("-r", "--recv-url", default="tcp://127.0.0.1:8001")
 @click.option("-s", "--send-url", default="tcp://127.0.0.1:8002")
@@ -318,7 +318,6 @@ def _get_device():
 @click.option("--poll-time-ms", default=10)
 def run(
     model_path,
-    word2vec_path,
     typology_path,
     recv_url,
     send_url,
@@ -328,12 +327,7 @@ def run(
     """Start an inference server for a specific model checkpoint."""
     model_path = pathlib.Path(model_path).expanduser().absolute()
     device = _get_device()
-    model = GnnModel(
-        model_path,
-        word2vec_path,
-        typology_path,
-        device=device,
-    )
+    model = GnnModel(model_path, typology_path, device=device)
 
     click.secho(f"setting up sender @ {send_url}", fg="green")
     sender = dsg.DsgSender(send_url)
@@ -410,11 +404,10 @@ def test(path_to_graph, send_url, recv_url, poll_time_ms, house_file, verbose):
 
 
 @main.command(name="generate")
-@click.argument("word2vec", type=click.Path(exists=True))
 @click.argument("typology_path", type=click.Path(exists=True))
-def generate_word2vec_map(word2vec, typology_path):
+def generate_word2vec_map(typology_path):
     """Pre-generate a pickled map between semantic labels and word2vec embeddings."""
-    dump_word2vec(word2vec, typology_path)
+    dump_word2vec(typology_path)
 
 
 if __name__ == "__main__":
