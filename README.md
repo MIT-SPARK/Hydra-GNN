@@ -7,10 +7,10 @@ If you find this code relevant for your work, please consider citing one or both
 
 ```
 @inproceedings{talak2021neuraltree,
- author = {Talak, Rajat and Hu, Siyi and Peng, Lisa and Carlone, Luca},
- booktitle = {Advances in Neural Information Processing Systems},
- title = {Neural Trees for Learning on Graphs},
- year = {2021}
+               author = {Talak, Rajat and Hu, Siyi and Peng, Lisa and Carlone, Luca},
+               booktitle = {Advances in Neural Information Processing Systems},
+               title = {Neural Trees for Learning on Graphs},
+               year = {2021}
 }
 
 @article{hughes2023foundations,
