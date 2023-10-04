@@ -23,7 +23,7 @@ from hydra_gnn.models import (
     HeterogeneousNeuralTreeNetwork,
 )
 from hydra_gnn.preprocess_dsgs import dsg_node_converter, hydra_object_feature_converter
-from hydra_gnn.utils import COLORMAP_DATA_PATH, WORD2VEC_MODEL_PATH
+from hydra_gnn.utils import COLORMAP_DATA_PATH, WORD2VEC_MODEL_PATH, package_dir
 import gensim
 import torch
 import yaml
@@ -32,18 +32,25 @@ import pandas as pd
 
 # %%
 # model files
-model_dir = "./output/pretrained_models/data_gt60_model_noSemantics"
+model_dir = str(package_dir() / "output/pretrained_models/data_gt60_model_noSemantics")
 with_word2vec = False
 hyper_param_path = f"{model_dir}/model.yaml"
 model_weight_path = f"{model_dir}/model_weights.pth"
 
 # example dsg
-example_dsg_path = "./tests/test_data/17DRP5sb8fy_0_gt_partial_dsg_1414.json"
-example_house_file_path = "./tests/test_data/17DRP5sb8fy.house"
+example_dsg_path = str(
+    package_dir() / "tests/test_data/17DRP5sb8fy_0_gt_partial_dsg_1414.json"
+)
+example_house_file_path = str(package_dir() / "tests/test_data/17DRP5sb8fy.house")
+
 
 # %%
-# room labels filtering function -- keep rooms that have more than 1 children (objects) or have siblings (rooms)
-room_removal_func = lambda room: not (len(room.children()) > 1 or room.has_siblings())
+# room labels filtering function -- keep rooms that have more than 1 children (objects)
+# or have siblings (rooms)
+def room_removal_func(room):
+    """Remove invalid rooms."""
+    return not (len(room.children()) > 1 or room.has_siblings())
+
 
 # dsg construction/conversion params
 threshold_near = 1.5
@@ -91,7 +98,12 @@ word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(
     WORD2VEC_MODEL_PATH, binary=True
 )
 object_feature_converter = hydra_object_feature_converter(colormap_data, word2vec_model)
-room_feature_converter = lambda i: np.zeros(300)
+
+
+def room_feature_converter(i):
+    """Empty room feature."""
+    return np.zeros(300)
+
 
 # %%
 # load example graph for testing

@@ -17,7 +17,7 @@ import os
 import numpy as np
 import spark_dsg as dsg
 from spark_dsg.mp3d import load_mp3d_info, repartition_rooms, add_gt_room_label
-from hydra_gnn.utils import plot_heterogeneous_graph
+from hydra_gnn.utils import plot_heterogeneous_graph, data_dir
 from hydra_gnn.preprocess_dsgs import (
     convert_label_to_y,
     add_object_connectivity,
@@ -26,11 +26,11 @@ from hydra_gnn.preprocess_dsgs import (
 
 # %%
 # dataset file paths
-hydra_dataset_dir = "./data/tro_graphs_2022_09_24"
-mp3d_housefile_dir = "./data/house_files"
-colormap_data_path = "./data/colormap.csv"
-mp3d_label_data_path = "./data/mpcat40.tsv"
-word2vec_model_path = "./data/GoogleNews-vectors-negative300.bin"
+hydra_dataset_dir = str(data_dir() / "tro_graphs_2022_09_24")
+mp3d_housefile_dir = str(data_dir() / "house_files")
+colormap_data_path = str(data_dir() / "colormap.csv")
+mp3d_label_data_path = str(data_dir() / "mpcat40.tsv")
+word2vec_model_path = str(data_dir() / "GoogleNews-vectors-negative300.bin")
 
 # %% [markdown]
 # ## Load DSG
@@ -38,14 +38,16 @@ word2vec_model_path = "./data/GoogleNews-vectors-negative300.bin"
 # %%
 # test dataset file paths
 # sparse room
-test_json_file = (
-    "./data/tro_graphs_2022_09_24/2t7WUuJeko7_trajectory_0/gt_partial_dsg_1330.json"
+test_json_file = os.path.join(
+    hydra_dataset_dir, "2t7WUuJeko7_trajectory_0/gt_partial_dsg_1330.json"
 )
-gt_house_file = "./data/house_files/2t7WUuJeko7.house"
+gt_house_file = os.path.join(mp3d_housefile_dir, "2t7WUuJeko7.house")
 
 # # single room
-# # test_json_file = "./data/tro_graphs_2022_09_24/YVUC4YcDtcY_trajectory_0/gt_partial_dsg_1000.json"
-# # gt_house_file = "./data/house_files/YVUC4YcDtcY.house"
+# test_json_file = os.path.join(
+    # hydra_dataset_dir, "YVUC4YcDtcY_trajectory_0/gt_partial_dsg_1000.json"
+# )
+# gt_house_file = os.path.join(mp3d_housefile_dir, "YVUC4YcDtcY.house")
 
 assert os.path.exists(test_json_file)
 assert os.path.exists(gt_house_file)
