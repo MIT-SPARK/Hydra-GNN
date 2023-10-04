@@ -11,12 +11,10 @@ import click
 import yaml
 from dataclasses import dataclass
 import time
-import sys
 
-sys.path.append(str(pathlib.Path(__file__).absolute().parent.parent))
-from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data  # noqa: E402
-import hydra_gnn.models  # noqa: E402
-from hydra_gnn.preprocess_dsgs import dsg_node_converter, _get_label_dict  # noqa: E402
+from hydra_gnn.mp3d_dataset import Hydra_mp3d_data, Hydra_mp3d_htree_data
+import hydra_gnn.models
+from hydra_gnn.preprocess_dsgs import dsg_node_converter, _get_label_dict
 
 ROOM_NAME_MAP = {
     "a": "bathroom",
