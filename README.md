@@ -1,4 +1,27 @@
-Various utilities for using GNNs with Hydra
+This repository contains code to train room-classification networks using 3D scene graphs as input.
+It is based on the papers:
+  - ["Neural Trees for Learning on Graphs"](https://proceedings.neurips.cc/paper/2021/file/ddf88ea64eaed0f3de5531ac964a0a1a-Paper.pdf)
+  - ["Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems"](https://arxiv.org/abs/2305.07154)
+
+If you find this code relevant for your work, please consider citing one or both of these papers. A bibtex entry is provided below:
+
+```
+@inproceedings{talak2021neuraltree,
+ author = {Talak, Rajat and Hu, Siyi and Peng, Lisa and Carlone, Luca},
+ booktitle = {Advances in Neural Information Processing Systems},
+ title = {Neural Trees for Learning on Graphs},
+ year = {2021}
+}
+
+@article{hughes2023foundations,
+         title={Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems},
+         author={Nathan Hughes and Yun Chang and Siyi Hu and Rajat Talak and Rumaisa Abdulhai and Jared Strader and Luca Carlone},
+         year={2023},
+         eprint={2305.07154},
+         archivePrefix={arXiv},
+         primaryClass={cs.RO}
+}
+```
 
 ## Installation
 
@@ -31,41 +54,55 @@ This code has been tested with:
   - PyTorch 1.12.1, PyTorch Geometric 2.2.0, and Cuda 11.3
   - PyTorch 1.8.1, PyTorch Geometric 2.0.4, and Cuda 10.2
 
-### Dataset Organization
+## Dataset Organization
 
-Put the dataset and pre-trained word2vec model in the folder ./data. It is organized as follows:
+All datasets and resoruces (such as the pre-trained word2vec model) live in the `./data` folder. It is organized as follows:
 
 - data
-  - house_files
-  - mp3d_old
-    - hydra_mp3d_dataset
-    - hydra_mp3d_non_gt_dataset
-    - mp3d_with_agents
-  - tro_graphs_2022_09_24
   - [GoogleNews-vectors-negative300.bin](https://www.kaggle.com/datasets/leadbest/googlenewsvectorsnegative300)
+  - Stanford3DSceneGraph
+    - [tiny](https://github.com/StanfordVL/3DSceneGraph)
+  - house_files (can be obtained from the habitat mp3d dataset following the download instructions [here](https://github.com/facebookresearch/habitat-sim/blob/main/DATASETS.md#matterport3d-mp3d-dataset))
+  - mp3d_benchmark
+  - mpcat40.tsv
+  - tro_graphs_2022_09_24
 
+Steps to get started for training:
+1) Obtain the word2vec model from [here](https://www.kaggle.com/datasets/leadbest/googlenewsvectorsnegative300)
+2) Obtain the house files for each mp3d scene from the MP3D dataset and extract them to the house_files directory
+3) Obtain the Hydra-produced scene graphs from [here](https://drive.google.com/drive/folders/1OgQOLYKUg5nRdZnfWQsFspBd7HEV5ZyW?usp=sharing)
+4) (optional) Obtain the Stanford3D tiny split from [here](https://github.com/StanfordVL/3DSceneGraph)
 
-### Dataset nomenclature
+## Training
 
-File ./datasets/mp3d.py contains the MP3D dataset code.
-MP3D(complete=True) will generate a dataset of full MP3D scenes.
-MP3D(complete=False) will generate a dataset of MP3D trajectory scenes.
-
-### Constructing H-tree
-
-```bash
-cd neural_tree
-
-python -W ignore construct.py
+Before training, you must construct the relevant pytorch-geometric dataset. For Stanford3D, you can do that via
+```
+python scripts/prepare_Stanford3DSG_for_training.py
+```
+and for MP3D you can do that via
+```
+python scripts/prepare_Stanford3DSG_for_training.py
 ```
 
-This will generate H-tree for all MP3D scenes.
-By default, it will use the MP3D(complete=True) dataset. This can be changed in the construct.py code.
+You can examine both scripts with `--help` to view possible arguments.
 
-#### Authorship
+Training for a specific dataset can be ran via
+```
+python scripts/train_Stanford.py
+```
+or
+```
+python scripts/train_mp3d.py
+```
+
+## Running with Hydra
+
+TBD
+
+## Authorship
+
+  - Primary author is Siyi Hu
 
   - H-tree Construction was written by Rajat Talak
 
-  - Training code was written by Siyi Hu
-
-  - Example inference server with Hydra was written by Nathan Hughes
+  - Example inference server for Hydra was written by Nathan Hughes
