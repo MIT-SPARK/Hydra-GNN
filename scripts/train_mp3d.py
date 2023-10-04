@@ -99,7 +99,7 @@ def main(
     assert task_id < num_tasks
 
     # setup log folder, accuracy files
-    print(f"output direcotry: {output_dir}")
+    print(f"output directory: {output_dir}")
     if output_dir.exists():
         print("Existing contents might be over-written.")
     else:
