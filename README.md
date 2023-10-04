@@ -114,6 +114,15 @@ Then, start Hydra with the `use_zmq_interface:=true` argument. For the uhumans2 
 roslaunch hydra_ros uhumans2.launch use_zmq_interface:=true
 ```
 
+## Notebooks
+
+There are several development notebooks available under the directory `notebooks`. These require [jupytext](https://jupytext.readthedocs.io/en/latest/) to view and use.
+You can do
+```
+pip3 install jupytext
+```
+to view and use them.
+
 ## Authorship
 
   - Primary author is Siyi Hu
