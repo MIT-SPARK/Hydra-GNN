@@ -149,10 +149,6 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
             )
 
         # post message passing pooling
-        # conv_dict = dict()
-        # for source, edge_name, target in HTREE_POOL_EDGE_TYPES:
-        #     conv_dict[source, edge_name, target] = LeafPool(aggr='mean')
-        # self.post_mp = HeteroConv(conv_dict)
         self.post_mp = LeafPool(aggr="mean")
 
     def forward(self, data):
@@ -162,20 +158,9 @@ class HeterogeneousNeuralTreeNetwork(nn.Module):
         if self.pre_mp is not None:
             x_dict.update(self.pre_mp(x_dict, edge_index_dict))
 
-        # x = F.dropout(x, p=self.dropout, training=self.training)
         for i in range(self.num_layers):
             if self.conv_block == "GAT_edge":
                 x_dict = self.convs[i](x_dict, edge_index_dict, data.edge_attr_dict)
-            elif self.conv_block == "PointTransformer":
-                pos_attr_dict = {
-                    edge_type: (data[edge_type[0]].pos, data[edge_type[-1]].pos)
-                    for edge_type in HTREE_EDGE_TYPES
-                }
-                x_dict = self.convs[i](
-                    x_dict=x_dict,
-                    edge_index_dict=edge_index_dict,
-                    pos_dict=pos_attr_dict,
-                )
             else:
                 x_dict = self.convs[i](x_dict, edge_index_dict)
 

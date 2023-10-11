@@ -38,7 +38,7 @@ class HeterogeneousNetwork(nn.Module):
         :param dropout: float, dropout ratio during training
         """
         super(HeterogeneousNetwork, self).__init__()
-        assert conv_block in ["GraphSAGE", "GAT", "GAT_edge", "PointTransformer"]
+        assert conv_block in ["GraphSAGE", "GAT", "GAT_edge"]
         self.conv_block = conv_block
         if output_dim is not None:
             assert output_dim_dict is None
@@ -99,13 +99,9 @@ class HeterogeneousNetwork(nn.Module):
     def forward(self, data):
         x_dict, edge_index_dict = data.x_dict, data.edge_index_dict
 
-        # x = F.dropout(x, p=self.dropout, training=self.training)
         for i in range(self.num_layers):
             if self.conv_block == "GAT_edge":
                 x_dict = self.convs[i](x_dict, edge_index_dict, data.edge_attr_dict)
-            elif self.conv_block == "PointTransformer":
-                # todo: siyi - this does not work yet
-                x_dict = self.convs[i](x_dict, edge_index_dict, data.pos_dict)
             else:
                 x_dict = self.convs[i](x_dict, edge_index_dict)
 

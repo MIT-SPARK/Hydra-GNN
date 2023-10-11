@@ -24,8 +24,6 @@ def build_conv_layer(conv_block, input_dim, output_dim, **kwargs):
             eps=0.0,
             train_eps=True,
         )
-    elif conv_block == "PointTransformer":
-        return pyg_nn.PointTransformerConv(input_dim, output_dim, **kwargs)
     else:
         return NotImplemented
 
@@ -94,19 +92,11 @@ def build_hetero_conv(
 ):
     conv_dict = dict()
     for source, edge_name, target in edge_types:
-        if conv_block == "PointTransformer":
-            conv_dict[source, edge_name, target] = build_conv_layer(
-                conv_block,
-                (input_dim_dict[source], input_dim_dict[target]),
-                output_dim_dict[target],
-                add_self_loops=(source == target),
-            )
-        else:
-            conv_dict[source, edge_name, target] = build_conv_layer(
-                conv_block,
-                (input_dim_dict[source], input_dim_dict[target]),
-                output_dim_dict[target],
-            )
+        conv_dict[source, edge_name, target] = build_conv_layer(
+            conv_block,
+            (input_dim_dict[source], input_dim_dict[target]),
+            output_dim_dict[target],
+        )
     return HeteroConv(conv_dict, aggr=aggr)
 
 

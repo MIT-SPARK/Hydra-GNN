@@ -122,7 +122,6 @@ class HomogeneousNetwork(nn.Module):
     def forward(self, data):
         x, edge_index, room_mask = data.x, data.edge_index, data.room_mask
 
-        # x = F.dropout(x, p=self.dropout, training=self.training)
         for i in range(self.num_layers):
             if self.conv_block == "GAT_edge":
                 x = self.convs[i](x, edge_index=edge_index, edge_attr=data.edge_attr)

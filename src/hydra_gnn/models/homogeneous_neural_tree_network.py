@@ -85,7 +85,6 @@ class HomogeneousNeuralTreeNetwork(HomogeneousNetwork):
         if self.pre_mp is not None:
             x = self.pre_mp(x, edge_index=init_edge_index)
 
-        # x = F.dropout(x, p=self.dropout, training=self.training)
         for i in range(self.num_layers):
             if self.conv_block == "GAT_edge":
                 x = self.convs[i](x, edge_index=edge_index, edge_attr=data.edge_attr)
