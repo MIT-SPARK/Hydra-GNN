@@ -4,7 +4,10 @@ import torch
 import torch_geometric.utils as pyg_utils
 from torch_geometric.data import Data
 from copy import deepcopy
-from neural_tree.h_tree import generate_jth, generate_node_labels
+from hydra_gnn.neural_tree.generate_junction_tree_hierarchies import (
+    generate_jth,
+    generate_node_labels,
+)
 
 
 class HTreeDataset:
@@ -96,7 +99,7 @@ def convert_to_networkx_jth(data: Data, task="graph", node_id=None, radius=None)
         G_jth.nodes[0]["clique_has"] = [0]
     data_jth = pyg_utils.from_networkx(G_jth)
 
-    try:  # todo: collect failure cases where input graph is not disconnected but output is (failure mode)
+    try:
         data_jth["diameter"] = nx.diameter(G_jth)
     except nx.NetworkXError:
         data_jth["diameter"] = 0

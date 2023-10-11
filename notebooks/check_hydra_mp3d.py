@@ -26,7 +26,7 @@ from spark_dsg.mp3d import (
 )
 from hydra_gnn.preprocess_dsgs import get_room_object_dsg, OBJECT_LABELS
 from hydra_gnn.utils import HYDRA_TRAJ_DIR, MP3D_HOUSE_DIR
-from debug_utils import (
+from hydra_gnn.debug_utils import (
     plot_room_object_heatmap,
     plot_room_barchart,
     plot_object_barchart,
