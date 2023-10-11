@@ -28,7 +28,6 @@ object_synonyms = []
 room_synonyms = [("a", "t"), ("z", "Z", "x", "p", "\x15")]
 
 
-# room_removal_func = lambda room: not (room.has_children() or room.has_siblings())
 def room_removal_func(room):
     """Return whether or not to remove rooms."""
     return not (len(room.children()) > 1 or room.has_siblings())

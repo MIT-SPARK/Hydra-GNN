@@ -41,7 +41,7 @@ def generate_jth(G, zero_feature, remove_edges_every_layer=True):
     JTG = nx.algorithms.tree.decomposition.junction_tree(G)
     node_list = [
         node[0] for node in JTG.nodes.data() if node[1]["type"] == "clique"
-    ]  # todo: what does this do?
+    ]
     JTG = nx.bipartite.projected_graph(JTG, node_list)
 
     # RootNodes = JTG.nodes ## PROBLEM!!!
@@ -136,13 +136,7 @@ def generate_jth_with_root_nodes(
     :param remove_edges_every_layer: bool, if true, remove edges in the same layer of the JT hierarchy
     :return: (JTH, RootNodes)
     """
-    # This function constructs a junction tree hierarchy tree for the graph G
-    ## TAKE OUT
-    ##JTG = nx.algorithms.tree.decomposition.junction_tree(G)
-    ##node_list = [node[0] for node in JTG.nodes.data() if node[1]['type'] == 'clique']   # todo: what does this do?
-    ##JTG = nx.bipartite.projected_graph(JTG, node_list)
 
-    ###########################
     Igraph = nx.Graph()
     node_index_count = 0
 
@@ -242,7 +236,6 @@ def generate_jth_with_root_nodes(
                 SGTreeTemp = nx.subgraph(Subgraph_Tree, Subgraph_Tree_RootNodes)
                 for an_edge in SGTreeTemp.edges():
                     Subgraph_Tree.remove_edge(*an_edge)
-            ##############################################################
 
             NewIndex = {}
             RootNodesTemp = []
