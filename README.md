@@ -47,7 +47,7 @@ The training code primarily relies on
   - [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)
   - [pyg_lib](https://github.com/pyg-team/pyg-lib) for Heterogeneous GNN operators
 
-While a default install **should** provide everything necessary, you may need to make sure the versions align correctly for these packages.
+While a default install **should** provide everything necessary, you may need to make sure the versions align correctly for these packages and are compatible with your CUDA version. You can either specify the desired versions in `setup.cfg` or manually install these libraries.
 
 This code has been tested with:
   - PyTorch 2.0.1, PyTorch Geometric 2.3.1, and Cuda 11.7
