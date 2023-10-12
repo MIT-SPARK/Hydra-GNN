@@ -63,9 +63,9 @@ param_dict_list = pgrid(
     help="training and validation ratio",
 )
 @click.option(
-    "--same_val_test",
+    "--keep_original_split",
     is_flag=True,
-    help="split val/test by trajectory (trajctory 0-1 for validation, 2-4 for testing)",
+    help="keep the original data split for MP3D",
 )
 @click.option(
     "--remove_word2vec",
@@ -84,7 +84,7 @@ def main(
     config_dir,
     config_name,
     train_val_ratio,
-    same_val_test,
+    keep_original_split,
     remove_word2vec,
     single_experiment,
 ):
@@ -118,9 +118,9 @@ def main(
             HYDRA_TRAJ_DIR, train_val_ratio[0], train_val_ratio[1]
         )
 
-    if same_val_test:
-        print("Regenerating val/test split using trajectories!")
-        print("Using 0-1 for training and 2-4 for testing")
+    if not keep_original_split:
+        print("Regenerating val/test split from original val/test scenes!")
+        print("Using trajectories 0-1 for training and 2-4 for testing")
 
     # create data lists
     dataset_dict = {
@@ -140,7 +140,7 @@ def main(
     if remove_word2vec:
         [data.remove_last_features(300) for data in data_list]
 
-    if same_val_test:
+    if not keep_original_split:
         for data in data_list:
             if data.get_data_info()["scene_id"] in split_dict["scenes_train"]:
                 dataset_dict["train"].add_data(data)
