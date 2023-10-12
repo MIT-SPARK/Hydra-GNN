@@ -45,12 +45,14 @@ param_dict_list = pgrid(
 )
 @click.option("--gpu_index", default=-1, type=int, help="gpu index (default: task_id)")
 @click.option(
-    "--config_dir", default=str(project_dir() / "config"), help="training config dir"
+    "--config_dir", 
+    default=str(project_dir() / "config/mp3d"), 
+    help="training config dir"
 )
 @click.option(
     "-c",
     "--config_name",
-    default="mp3d_default_config.yaml",
+    default="baseline_gt60.yaml",
     help="training config file",
 )
 @click.option(

@@ -81,10 +81,12 @@ python scripts/prepare_Stanford3DSG_for_training.py
 ```
 and for MP3D you can do that via
 ```
-python scripts/prepare_Stanford3DSG_for_training.py
+python scripts/prepare_hydra_mp3d_training.py --repartition_rooms 
 ```
-
-You can examine both scripts with `--help` to view possible arguments.
+To train with Neural Tree algorithm, you need to decompose the input graphs to H-trees with `--save_htree`. 
+For MP3D, `--repartition_rooms` replaces room nodes from Hydra's room segmentation algorithm by ground truth rooms, 
+and establish room-object connectivity using detected object geometry. 
+You can view other possible arguments in both scripts with `--help`.
 
 Training for a specific dataset can be run via
 ```

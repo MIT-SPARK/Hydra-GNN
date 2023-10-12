@@ -42,10 +42,10 @@ def _empty_w2v(x):
 
 
 @click.command()
-@click.option("-n", "--output_filename", default="data.pkl", help="output file name")
+@click.option("-n", "--output_filename", default=None, help="output file name")
 @click.option(
     "--min_iou",
-    default=0.0,
+    default=0.6,
     type=float,
     help="minimum IoU threshold for room label assignment",
 )
@@ -78,6 +78,10 @@ def main(
     """Prepare an mp3d dataset."""
     param_filename = "params.yaml"
     skipped_filename = "skipped_partial_scenes.yaml"
+    if output_filename is None:
+        output_prefix = "htree" if save_htree else "data"
+        output_filename = "{}_gt{}.pkl".format(output_prefix, int(min_iou*100)) \
+            if repartition_rooms else "{}_{}.pkl".format(output_prefix, int(min_iou*100))
 
     print(f"Saving torch graphs as htree:  {save_htree}")
     print(f"Saving torch graphs as homogeneous torch data: {save_homogeneous}")

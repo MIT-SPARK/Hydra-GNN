@@ -1,6 +1,6 @@
 """Make stanford3d data."""
 from hydra_gnn.utils import (
-    PROJECT_DIR,
+    project_dir,
     WORD2VEC_MODEL_PATH,
     STANFORD3DSG_DATA_DIR,
     STANFORD3DSG_GRAPH_PATH,
@@ -33,17 +33,18 @@ def _make_zero_feature(x):
 
 
 @click.command()
-@click.option("-n", "--output_filename", default="data.pkl", help="output file name")
+@click.option("-n", "--output_filename", default=None, help="output file name")
 @click.option(
     "-o",
     "--output_dir",
-    default=None,
+    default=str(project_dir() / "output/preprocessed_Stanford3DSG"),
     help="output directory (defaults to output/preprocessed_Stanford3DSG",
 )
 @click.option(
     "--from_raw_data",
     is_flag=True,
-    help="use raw Stanford3DSG to construct graphs instead of pre-saved graphs",
+    help="use raw Stanford3DSG and specified edge data params to construct graphs"
+    " (this will result in 35 multi-room graphs instead of 482 single room graphs)",
 )
 @click.option("--save_htree", is_flag=True, help="store htree data")
 @click.option(
@@ -53,24 +54,23 @@ def _make_zero_feature(x):
 )
 def main(output_filename, output_dir, from_raw_data, save_htree, save_word2vec):
     """Prepare stanford3d data for training."""
-    if output_dir:
-        output_dir = pathlib.Path(output_dir).expanduser().absolute()
-    else:
-        output_dir = pathlib.Path(PROJECT_DIR) / "output" / "preprocessed_Stanford3DSG"
-
-    if not output_dir.exists():
-        output_dir.mkdir(parents=True)
-
-    output_path = output_dir / output_filename
-
     param_filename = "params.yaml"
+    if output_filename is None:
+        output_filename = "htree" if save_htree else "data"
+        output_filename += ".pkl" if from_raw_data else "_nt.pkl"
+
     print(f"Computing torch graphs from raw Stanford3DSG data: {from_raw_data}")
     print(f"Saving torch graphs as htree: {save_htree}")
     print(f"Saving torch graphs with word2vec features: {save_word2vec}")
     print(f"Output directory: {output_dir}")
     print(f"Output data files: {output_filename}, ({param_filename})")
+    
+    output_path = pathlib.Path(output_dir).expanduser().absolute() / output_filename
     if output_path.exists():
         input("Output data file exists. Press any key to proceed...")
+    
+    if not output_path.parent.exists():
+        output_path.parent.mkdir(parents=True)
 
     if save_word2vec:
         word2vec_model = gensim.models.KeyedVectors.load_word2vec_format(
@@ -97,15 +97,20 @@ def main(output_filename, output_dir, from_raw_data, save_htree, save_word2vec):
                 data = Stanford3DSG_htree_data(
                     os.path.join(STANFORD3DSG_DATA_DIR, data_file)
                 )
-
             else:
                 data = Stanford3DSG_data(os.path.join(STANFORD3DSG_DATA_DIR, data_file))
             data.add_object_edges(
                 threshold_near=threshold_near, max_near=max_near, max_on=max_on
             )
-            data.compute_torch_data(
+            htree_time = data.compute_torch_data(
                 use_heterogeneous=True, node_converter=node_converter
             )
+            if save_htree:
+                max_htree_construction_time = max(
+                    max_htree_construction_time, htree_time
+                )
+                htree_construction_time += htree_time
+
             data.clear_dsg()
             data_list.append(data)
     else:

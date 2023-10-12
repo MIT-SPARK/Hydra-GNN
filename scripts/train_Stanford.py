@@ -34,12 +34,14 @@ param_dict_list = pgrid(
 )
 @click.option("--gpu_index", default=-1, type=int, help="gpu index (default: task_id)")
 @click.option(
-    "--config_dir", default=str(project_dir() / "config"), help="training config dir"
+    "--config_dir", 
+    default=str(project_dir() / "config/Stanford3D"), 
+    help="training config dir"
 )
 @click.option(
     "-c",
     "--config_name",
-    default="Stanford3DSG_default_config.yaml",
+    default="baseline_GraphSAGE.yaml",
     help="training config file",
 )
 @click.option(
