@@ -23,7 +23,7 @@ from hydra_gnn.models import (
     HeterogeneousNeuralTreeNetwork,
 )
 from hydra_gnn.preprocess_dsgs import dsg_node_converter, hydra_object_feature_converter
-from hydra_gnn.utils import COLORMAP_DATA_PATH, WORD2VEC_MODEL_PATH, package_dir
+from hydra_gnn.utils import COLORMAP_DATA_PATH, WORD2VEC_MODEL_PATH, project_dir
 import gensim
 import torch
 import yaml
@@ -32,16 +32,16 @@ import pandas as pd
 
 # %%
 # model files
-model_dir = str(package_dir() / "output/pretrained_models/data_gt60_model_noSemantics")
+model_dir = str(project_dir() / "output/pretrained_models/data_gt60_model_noSemantics")
 with_word2vec = False
 hyper_param_path = f"{model_dir}/model.yaml"
 model_weight_path = f"{model_dir}/model_weights.pth"
 
 # example dsg
 example_dsg_path = str(
-    package_dir() / "tests/test_data/17DRP5sb8fy_0_gt_partial_dsg_1414.json"
+    project_dir() / "tests/test_data/17DRP5sb8fy_0_gt_partial_dsg_1414.json"
 )
-example_house_file_path = str(package_dir() / "tests/test_data/17DRP5sb8fy.house")
+example_house_file_path = str(project_dir() / "tests/test_data/17DRP5sb8fy.house")
 
 
 # %%
