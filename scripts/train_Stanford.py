@@ -1,5 +1,5 @@
 """Train stanford3d."""
-from hydra_gnn.utils import project_dir, plist, pgrid
+from hydra_gnn.utils import project_dir, plist, pgrid, update_existing_keys
 from hydra_gnn.Stanford3DSG_dataset import Stanford3DSG_htree_data, Stanford3DSG_dataset
 from hydra_gnn.semisupervised_training_job import SemiSupervisedTrainingJob
 from statistics import mean, stdev
@@ -13,18 +13,14 @@ import pandas as pd
 from pprint import pprint
 
 
-# parameter sweep setup (note: last GAT hidden_dims is label dim and not specified)
-GAT_hidden_dims = plist("GAT_hidden_dims", [[64, 64], [128, 128]])
-GAT_head = plist("GAT_head", [6])  # same number of head in each conv layer
-GAT_concat = plist(
-    "GAT_concat", [True]
-)  # same concate in each conv layer except the last (always False)
+### Parameter sweep example code ##############
+# This is used only with --param_sweep flag
+# Adjust search range or add other parameters as needed 
 dropout = plist("dropout", [0, 0.25])
 lr = plist("lr", [0.001, 0.0005])
 weight_decay = plist("weight_decay", [0.0, 0.0001, 0.001])
-param_dict_list = pgrid(
-    lr, weight_decay, GAT_hidden_dims, GAT_head, GAT_concat, dropout
-)
+param_dict_list = pgrid(lr, weight_decay, dropout)
+###############################################
 
 
 @click.command()
@@ -52,9 +48,9 @@ param_dict_list = pgrid(
     help="training and validation ratio",
 )
 @click.option(
-    "--single_experiment",
+    "--param_sweep",
     is_flag=True,
-    help="run single experiment using config file instead of parameter sweep",
+    help="run parameter sweep and ignore corresponding parameters in the config file",
 )
 def main(
     task_id,
@@ -63,7 +59,7 @@ def main(
     config_dir,
     config_name,
     train_val_ratio,
-    single_experiment,
+    param_sweep,
 ):
     """Run stanford3d training."""
     print(f"cuda available: {torch.cuda.is_available()}")
@@ -103,7 +99,7 @@ def main(
         dataset.add_data(data)
 
     # log resutls
-    log_params = list(param_dict_list[0].keys())
+    log_params = list(param_dict_list[0].keys()) if param_sweep else []
     df = pd.DataFrame(
         columns=["log_dir"]
         + log_params
@@ -118,43 +114,31 @@ def main(
     print(f"Train val test split ratio: {train_ratio} : {val_ratio} : {test_ratio}")
 
     # run experiment
-    if single_experiment:
+    if not param_sweep:
         experiment_id_list = [0]
     else:
         num_param_set = len(param_dict_list)
         experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
 
     for experiment_i in experiment_id_list:
-        if single_experiment:
+        if not param_sweep:
             print(f"\nUse all parameters in config: {config_file}")
             experiment_output_dir_i = output_dir / "experiment"
             config_output_path = output_dir / "config.yaml"
             accuracy_file_path = output_dir / "accuracy.csv"
-            param_list = ["-"] * len(log_params)
+            param_list = []
         else:
+            ### Parameter sweep example code ##############
             print(f"\nExperiment {experiment_i+1} / {len(param_dict_list)}")
             experiment_output_dir_i = output_dir / f"experiment_{experiment_i}"
             config_output_path = experiment_output_dir_i / "config.yaml"
             accuracy_file_path = output_dir / f"accuracy-{task_id}.csv"
-            # update parameter
+            # update parameters
             param_dict = param_dict_list[experiment_i]
             param_list = [param_dict[key] for key in log_params]
-            if config["network"]["conv_block"][:3] == "GAT":
-                # todo: this is for temporary GAT tuning with single attention head
-                if config["data"]["type"] == "homogeneous":
-                    param_dict["GAT_heads"] = len(param_dict["GAT_hidden_dims"]) * [
-                        param_dict["GAT_head"]
-                    ]
-                    param_dict["GAT_concats"] = len(param_dict["GAT_hidden_dims"]) * [
-                        param_dict["GAT_concat"]
-                    ]
-                else:
-                    param_dict["GAT_heads"] = len(param_dict["GAT_hidden_dims"]) * [
-                        param_dict["GAT_head"]
-                    ] + [param_dict["GAT_head"]]
-                    param_dict["GAT_concats"] = len(param_dict["GAT_hidden_dims"]) * [
-                        param_dict["GAT_concat"]
-                    ] + [False]
+            update_existing_keys(config['network'], param_dict)
+            update_existing_keys(config['optimization'], param_dict)
+            ###############################################
 
         pprint("config:")
         pprint(config)
@@ -199,7 +183,7 @@ def main(
             test_time_list.append(info["test_time"])
 
             # save type separated accuracy for single experiment
-            if single_experiment:
+            if not param_sweep:
                 val_room_accuracy, val_object_accuracy = train_job.test(
                     mask_name="val_mask", get_type_separated_accuracy=True
                 )
@@ -227,7 +211,7 @@ def main(
         df.to_csv(str(accuracy_file_path), index=False)
 
         # save type separated accuracy for single experiment
-        if single_experiment:
+        if not param_sweep:
             with accuracy_file_path.open("a") as output_file:
                 print(
                     f"\nValidation accuracy: {mean(val_accuracy_list)} +/- {stdev(val_accuracy_list)}",

@@ -24,18 +24,14 @@ import pathlib
 from pprint import pprint
 
 
-# parameter sweep setup
-GAT_hidden_dims = plist("GAT_hidden_dims", [[32, 32], [64, 64]])
-GAT_head = plist("GAT_head", [3])  # same number of head in each conv layer
-GAT_concat = plist(
-    "GAT_concat", [True, False]
-)  # same concate in each conv layer except the last (always False)
+### Parameter sweep example code ##############
+# This is used only with --param_sweep flag
+# Adjust search range or add other parameters as needed 
 dropout = plist("dropout", [0.4])
 lr = plist("lr", [0.001])
 weight_decay = plist("weight_decay", [0.0001, 0.001])
-param_dict_list = pgrid(
-    lr, weight_decay, GAT_hidden_dims, GAT_head, GAT_concat, dropout
-)
+param_dict_list = pgrid(lr, weight_decay, dropout)
+###############################################
 
 
 @click.command()
@@ -73,9 +69,9 @@ param_dict_list = pgrid(
     help="remove word2vec features from node features",
 )
 @click.option(
-    "--single_experiment",
+    "--param_sweep",
     is_flag=True,
-    help="run single experiment using config file instead of parameter sweep",
+    help="run parameter sweep and ignore corresponding parameters in the config file",
 )
 def main(
     task_id,
@@ -86,7 +82,7 @@ def main(
     train_val_ratio,
     keep_original_split,
     remove_word2vec,
-    single_experiment,
+    param_sweep,
 ):
     """Run training for mp3d."""
     print(f"cuda available: {torch.cuda.is_available()}")
@@ -174,7 +170,7 @@ def main(
     print(f"  test: {_stats(dataset_dict, 'test')}")
 
     # log resutls
-    log_params = list(param_dict_list[0].keys())
+    log_params = list(param_dict_list[0].keys()) if param_sweep else []
     df = pd.DataFrame(
         columns=["log_dir"]
         + log_params
@@ -184,48 +180,34 @@ def main(
     )
 
     # run experiment
-    if single_experiment:
+    if not param_sweep:
         experiment_id_list = [0]
     else:
         num_param_set = len(param_dict_list)
         experiment_id_list = list(range(num_param_set))[task_id:num_param_set:num_tasks]
 
     for experiment_i in experiment_id_list:
-        if single_experiment:
+        if not param_sweep:
             print(f"\nUse all parameters in config: {config_file}")
             experiment_output_dir_i = output_dir / "experiment"
             config_output_path_i = output_dir / "config.yaml"
             accuracy_file_path = output_dir / "accuracy.csv"
-            param_list = ["-"] * len(log_params)
+            param_list = []
         else:
+            ### Parameter sweep example code ##############
             print(f"\nExperiment {experiment_i+1} / {len(param_dict_list)}")
             experiment_output_dir_i = output_dir / f"experiment_{experiment_i}"
             config_output_path_i = experiment_output_dir_i / "config.yaml"
             accuracy_file_path = output_dir / f"accuracy-{task_id}.csv"
+            # update parameters
             param_dict = param_dict_list[experiment_i]
             param_list = [param_dict[key] for key in log_params]
-            if config["network"]["conv_block"][:3] == "GAT":
-                # todo: this is for temporary GAT tuning
-                param_dict["GAT_heads"] = len(param_dict["GAT_hidden_dims"]) * [
-                    param_dict["GAT_head"]
-                ] + [param_dict["GAT_head"]]
-                param_dict["GAT_concats"] = len(param_dict["GAT_hidden_dims"]) * [
-                    param_dict["GAT_concat"]
-                ] + [False]
-
-                # check GAT params
-                if (
-                    len(param_dict["GAT_heads"])
-                    != len(param_dict["GAT_hidden_dims"]) + 1
-                    or len(param_dict["GAT_concats"])
-                    != len(param_dict["GAT_hidden_dims"]) + 1
-                ):
-                    print("  Skip - invalid GAT param")
-                    continue
             update_existing_keys(config["network"], param_dict)
             update_existing_keys(config["optimization"], param_dict)
-            pprint("config:")
-            pprint(config)
+            ###############################################
+
+        pprint("config:")
+        pprint(config)
 
         # clean up tensorboard output directory
         if experiment_output_dir_i.exists():
@@ -262,46 +244,6 @@ def main(
             training_epoch_list.append(info["num_epochs"])
             test_time_list.append(info["test_time"])
 
-            # log per label accuracy for single experiment
-            if single_experiment:
-                train_accuracy, train_accuracy_matrix = train_job.test(
-                    DataLoader(train_job.get_dataset("train"), batch_size=4096), True
-                )
-                val_accuracy, val_accuracy_matrix = train_job.test(
-                    DataLoader(train_job.get_dataset("val"), batch_size=4096), True
-                )
-                test_accuracy, test_accuracy_matrix = train_job.test(
-                    DataLoader(train_job.get_dataset("test"), batch_size=4096), True
-                )
-                assert (
-                    abs(val_accuracy - best_acc[0]) < 0.001
-                ), f"{val_accuracy}, {best_acc[0]}"
-                assert (
-                    abs(test_accuracy - best_acc[1]) < 0.001
-                ), f"{test_accuracy}, {best_acc[1]}"
-                num_labels = train_accuracy_matrix.shape[1]
-                output_header = (
-                    [f"{lab}[train]" for lab in range(num_labels)]
-                    + [f"{lab}[val]" for lab in range(num_labels)]
-                    + [f"{lab}[test]" for lab in range(num_labels)]
-                )
-                output_header = ",".join(output_header)
-                np.savetxt(
-                    f"{experiment_output_dir_i}/{j}/accuracy_matrix.csv",
-                    np.concatenate(
-                        (
-                            train_accuracy_matrix,
-                            val_accuracy_matrix,
-                            test_accuracy_matrix,
-                        ),
-                        axis=1,
-                    ),
-                    fmt="%i",
-                    delimiter=",",
-                    comments="",
-                    header=output_header,
-                )
-
         # save param and accuracy
         output_data_list = (
             [f"experiment_{experiment_i}"]
@@ -315,9 +257,6 @@ def main(
             ]
         )
         df = pd.concat([df, pd.DataFrame(data=[output_data_list], columns=df.columns)])
-        if not single_experiment:
-            df["GAT_concat"] = df["GAT_concat"].astype(bool)
-
         df.to_csv(accuracy_file_path, index=False)
 
 
