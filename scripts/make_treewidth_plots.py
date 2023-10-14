@@ -6,6 +6,7 @@ import seaborn as sns
 import matplotlib
 import matplotlib.pyplot as plt
 import pathlib
+from run_treewidth_analysis import data_dir
 
 
 def _load_df(data_files, labels):
@@ -68,16 +69,16 @@ def _plot_treewidth(df, output_path, filename):
 
 
 @click.command()
-@click.option("-o", "--output", default=None)
-def main(output):
+@click.option("-o", "--output_dir", default=None)
+def main(output_dir):
     """Plot room and object tree-width."""
     object_df = _load_df(["mp3dnew_objects.pkl"], ["Matterport3D"])
     room_df = _load_df(["mp3dnew_rooms.pkl"], ["Matterport3D"])
 
-    if output:
-        output_path = pathlib.Path(output).expanduser().absolute()
+    if output_dir:
+        output_path = pathlib.Path(output_dir).expanduser().absolute()
     else:
-        output_path = None
+        output_path = data_dir() / "treewidth"
 
     _plot_treewidth(object_df, output_path, "object_tw.pdf")
     _plot_treewidth(room_df, output_path, "room_tw.pdf")

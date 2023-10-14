@@ -31,7 +31,7 @@ class MP3D(torch.utils.data.Dataset):
 
     def __init__(self, name):
         """Make a dataset."""
-        self.hydra_dataset_dir = str(data_dir / name)
+        self.hydra_dataset_dir = str(data_dir() / name)
 
         self.trajectory_dirs = os.listdir(self.hydra_dataset_dir)
 
@@ -254,7 +254,7 @@ def main(name, output):
     if output:
         output_path = pathlib.Path(output).expanduser().absolute()
     else:
-        output_path = data_dir / "treewidth"
+        output_path = data_dir() / "treewidth"
 
     if output_path.exists():
         click.secho("Output path already exists: {output_path}!", fg="red")
