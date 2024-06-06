@@ -1,46 +1,134 @@
-Various utilities for using GNNs with Hydra
+This repository contains code to train room-classification networks using 3D scene graphs as input.
+It is based on the papers:
+  - ["Neural Trees for Learning on Graphs"](https://proceedings.neurips.cc/paper/2021/file/ddf88ea64eaed0f3de5531ac964a0a1a-Paper.pdf)
+  - ["Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems"](https://arxiv.org/abs/2305.07154)
+
+If you find this code relevant for your work, please consider citing one or both of these papers. Bibtex entries are provided below:
+
+```
+@inproceedings{talak2021neuraltree,
+               author = {Talak, Rajat and Hu, Siyi and Peng, Lisa and Carlone, Luca},
+               booktitle = {Advances in Neural Information Processing Systems},
+               title = {Neural Trees for Learning on Graphs},
+               year = {2021}
+}
+
+@article{hughes2023foundations,
+         title={Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems},
+         author={Nathan Hughes and Yun Chang and Siyi Hu and Rajat Talak and Rumaisa Abdulhai and Jared Strader and Luca Carlone},
+         year={2023},
+         eprint={2305.07154},
+         archivePrefix={arXiv},
+         primaryClass={cs.RO}
+}
+```
 
 ## Installation
 
-Make a virtual environment and install `requirements.txt` for a minimal set of functionality. Some code may require the hydra python bindings (see [here](https://github.mit.edu:SPARK/hydra_python) for details).
-
-The minimal requirement to run training code with pickled dataset file is installing [PyTorch](https://pytorch.org/get-started/locally/), [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html) with [pyg_lib](https://github.com/pyg-team/pyg-lib) for Heterogeneous GNN operators, and the following dependencies:
+Make a virtual environment:
 ```
-pip install pandas plotly networkx tensorboardX pyyaml
+# if you don't have virtualenv already
+# pip3 install --user virtualenv
+cd path/to/env
+python3 -m virtualenv --download -p $(which python3) hydra_gnn
 ```
-This code is tested on PyTorch 1.12.1, PyTorch Geometric 2.2.0 with Cuda 11.3, and PyTorch 1.8.1, PyTorch Geometric 2.0.4 with Cuda 10.2.
 
-## H-tree Construction 
-by Rajat Talak
+Activate the virtual environment and install:
+```
+cd path/to/installation
+git clone git@github.com:MIT-SPARK/Hydra-GNN.git
+cd Hydra-GNN
+source path/to/env/hydra_gnn/bin/activate
+pip install -e .
+```
 
-### Dataset
+The training code primarily relies on
+  - [PyTorch](https://pytorch.org/get-started/locally/),
+  - [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)
+  - [pyg_lib](https://github.com/pyg-team/pyg-lib) for Heterogeneous GNN operators
 
-Put the dataset and pre-trained word2vec model in the folder ./data. It is organized as follows:
+While a default install **should** provide everything necessary, you may need to make sure the versions align correctly for these packages and are compatible with your CUDA version. You can either specify the desired versions in `setup.cfg` or manually install these libraries.
+
+This code has been tested with:
+  - PyTorch 2.0.1, PyTorch Geometric 2.3.1, and Cuda 11.7
+  - PyTorch 1.12.1, PyTorch Geometric 2.2.0, and Cuda 11.3
+  - PyTorch 1.8.1, PyTorch Geometric 2.0.4, and Cuda 10.2
+
+## Dataset Organization
+
+All datasets and resoruces (such as the pre-trained word2vec model) live in the `./data` folder. It is organized as follows:
 
 - data
-  - house_files
-  - mp3d_old
-    - hydra_mp3d_dataset
-    - hydra_mp3d_non_gt_dataset
-    - mp3d_with_agents
-  - tro_graphs_2022_09_24
   - [GoogleNews-vectors-negative300.bin](https://www.kaggle.com/datasets/leadbest/googlenewsvectorsnegative300)
+  - Stanford3DSceneGraph
+    - [tiny](https://github.com/StanfordVL/3DSceneGraph)
+  - house_files (can be obtained from the habitat mp3d dataset following the download instructions [here](https://github.com/facebookresearch/habitat-sim/blob/main/DATASETS.md#matterport3d-mp3d-dataset))
+  - mp3d_benchmark
+  - mpcat40.tsv
+  - tro_graphs_2022_09_24
 
+Steps to get started for training:
+1) Obtain the word2vec model from [here](https://www.kaggle.com/datasets/leadbest/googlenewsvectorsnegative300)
+2) Obtain the house files for each mp3d scene from the MP3D dataset and extract them to the house_files directory
+3) Obtain the Hydra-produced scene graphs from [here](https://drive.google.com/drive/folders/1OgQOLYKUg5nRdZnfWQsFspBd7HEV5ZyW?usp=sharing)
+4) (optional) Obtain the Stanford3D tiny split from [here](https://github.com/StanfordVL/3DSceneGraph)
 
-### Dataset nomenclature
+## Training
 
-File ./datasets/mp3d.py contains the MP3D dataset code. 
-MP3D(complete=True) will generate a dataset of full MP3D scenes.
-MP3D(complete=False) will generate a dataset of MP3D trajectory scenes.
+Before training, you must construct the relevant pytorch-geometric dataset. For Stanford3D, you can do that via
+```
+python scripts/prepare_Stanford3DSG_for_training.py
+```
+and for MP3D you can do that via
+```
+python scripts/prepare_hydra_mp3d_training.py --repartition_rooms 
+```
+To train with Neural Tree algorithm, you need to decompose the input graphs to H-trees with `--save_htree`. 
+For MP3D, `--repartition_rooms` replaces room nodes from Hydra's room segmentation algorithm by ground truth rooms, 
+and establish room-object connectivity using detected object geometry. 
+You can view other possible arguments in both scripts with `--help`.
 
-
-### Constructing H-tree 
-
-```bash
-cd neural_tree 
-
-python -W ignore construct.py
+Training for a specific dataset can be run via
+```
+python scripts/train_Stanford.py
+```
+or
+```
+python scripts/train_mp3d.py
 ```
 
-This will generate H-tree for all MP3D scenes. 
-By default, it will use the MP3D(complete=True) dataset. This can be changed in the construct.py code.
+## Running with Hydra
+
+We provide pre-trained models [here](https://drive.google.com/drive/folders/1OgQOLYKUg5nRdZnfWQsFspBd7HEV5ZyW?usp=sharing)
+
+First, start the GNN model via
+```
+./bin/room_classification_server server path/to/pretrained/model path/to/hydra/label/space
+```
+
+For the uhumans2 office, this would look like
+```
+./bin/room_classification_server server path/to/pretrained/model path/to/hydra/config/uhumans2/uhumans2_office_typology.yaml
+```
+
+Then, start Hydra with the `use_zmq_interface:=true` argument. For the uhumans2 office scene, this would look like:
+```
+roslaunch hydra_ros uhumans2.launch use_zmq_interface:=true
+```
+
+## Notebooks
+
+There are several development notebooks available under the directory `notebooks`. These require [jupytext](https://jupytext.readthedocs.io/en/latest/) to view and use.
+You can do
+```
+pip3 install jupytext
+```
+to view and use them.
+
+## Authorship
+
+  - Primary author is Siyi Hu
+
+  - H-tree Construction was written by Rajat Talak
+
+  - Example inference server for Hydra was written by Nathan Hughes

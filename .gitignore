@@ -134,6 +134,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+hydra_gnn/
 .env
 .venv
 env/

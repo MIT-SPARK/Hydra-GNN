@@ -1,6 +1,0 @@
-numpy
-scipy
-seaborn
-open3d
-shapely
-git+ssh://git@github.mit.edu/SPARK/Spark-DSG@develop
