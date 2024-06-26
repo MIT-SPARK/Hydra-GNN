@@ -1,11 +1,11 @@
 This repository contains code to train room-classification networks using 3D scene graphs as input.
 It is based on the papers:
   - ["Neural Trees for Learning on Graphs"](https://proceedings.neurips.cc/paper/2021/file/ddf88ea64eaed0f3de5531ac964a0a1a-Paper.pdf)
-  - ["Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems"](https://arxiv.org/abs/2305.07154)
+  - ["Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems"](https://journals.sagepub.com/doi/10.1177/02783649241229725)
 
 If you find this code relevant for your work, please consider citing one or both of these papers. Bibtex entries are provided below:
 
-```
+```bibtex
 @inproceedings{talak2021neuraltree,
                author = {Talak, Rajat and Hu, Siyi and Peng, Lisa and Carlone, Luca},
                booktitle = {Advances in Neural Information Processing Systems},
@@ -13,13 +13,14 @@ If you find this code relevant for your work, please consider citing one or both
                year = {2021}
 }
 
-@article{hughes2023foundations,
-         title={Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems},
-         author={Nathan Hughes and Yun Chang and Siyi Hu and Rajat Talak and Rumaisa Abdulhai and Jared Strader and Luca Carlone},
-         year={2023},
-         eprint={2305.07154},
-         archivePrefix={arXiv},
-         primaryClass={cs.RO}
+@article{hughes2024foundations,
+    title={Foundations of Spatial Perception for Robotics: Hierarchical Representations and Real-time Systems},
+    fullauthor={Nathan Hughes and Yun Chang and Siyi Hu and Rajat Talak and Rumaisa Abdulhai and Jared Strader and Luca Carlone},
+    author={N. Hughes and Y. Chang and S. Hu and R. Talak and R. Abdulhai and J. Strader and L. Carlone},
+    journal={The International Journal of Robotics Research},
+    doi={10.1177/02783649241229725},
+    url={https://doi.org/10.1177/02783649241229725},
+    year={2024},
 }
 ```
 
